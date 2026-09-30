@@ -1,0 +1,51 @@
+/* Мінімум стилів: цей приклад — про JavaScript. Іменування класів — BEM. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* --- page: на всю висоту вікна, робочий стіл займає решту --- */
+.page { display: flex; flex-direction: column; height: 100vh; margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1f2328; }
+
+/* --- toolbar --- */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: .6rem 1rem; background: #f6f8fa; }
+.toolbar__title { margin: 0; font-size: 1.25rem; }
+.toolbar__button { font: inherit; }
+.toolbar__hint { flex-basis: 100%; margin: 0; color: #59636e; font-size: .875rem; }
+
+/* --- lab --- */
+.lab { padding: .4rem 1rem; background: #fff8c5; }
+.lab__summary { cursor: pointer; font-weight: 600; }
+.lab__options { display: flex; flex-wrap: wrap; gap: .3rem 1.5rem; }
+.lab__debug { margin: .4rem 0 0; font-size: .8rem; }
+
+/* --- desktop: система координат для вікон --- */
+.desktop { position: relative; flex: 1; overflow: hidden; background: #d0d7de; }
+
+/* --- window --- */
+.window {
+    position: absolute;
+    top: 0;
+    left: 0;                     /* позицію задає лише transform із JS */
+    width: 16rem;
+    border-radius: .8rem;
+    background: #fff;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+}
+.window--active { outline: 3px solid hsl(var(--hue) 70% 40%); }
+.window--dragging { opacity: .85; box-shadow: 0 16px 32px rgb(0 0 0 / 30%); }
+.window--maximized { right: 0; bottom: 0; width: auto; border-radius: 0; }
+
+.window__header {
+    display: flex;
+    align-items: center;
+    padding: .3rem .3rem .3rem .8rem;
+    border-radius: .8rem .8rem 0 0;
+    color: #fff;
+    background: hsl(var(--hue) 70% 40%);
+    cursor: grab;
+    touch-action: none;          /* палець тягне вікно, а не прокручує сторінку */
+    user-select: none;
+}
+.window__title { flex: 1; margin: 0; font-size: 1rem; }
+.window__button { border: 0; background: none; color: inherit; font-size: 1.2rem; cursor: pointer; }
+.window__text { margin: 0; padding: .8rem; min-height: 4rem; }
+.window__footer { padding: 0 .8rem .4rem; color: #59636e; font: .75rem ui-monospace, monospace; }

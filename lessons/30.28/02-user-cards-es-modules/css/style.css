@@ -1,0 +1,43 @@
+/* Мінімум стилів: цей приклад — про JavaScript. Іменування класів — BEM. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* --- page --- */
+.page { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1f2328; background: #f6f8fa; }
+.page__header, .page__main { max-width: 56rem; margin-inline: auto; padding: 1rem; }
+.page__title { margin: 0; }
+.page__subtitle { margin: 0; color: #59636e; }
+.page__badge { display: inline-block; margin: .5rem 0 0; padding: .2rem .6rem; border-radius: .4rem; color: #fff; background: #8250df; }
+.page__warning { padding: .6rem 1rem; border-radius: .4rem; color: #fff; background: #cf222e; }
+
+/* --- button --- */
+.button { padding: .4rem .9rem; border: 1px solid #d1d9e0; border-radius: .4rem; background: #fff; font: inherit; cursor: pointer; }
+.button--primary { border-color: #1f6feb; background: #1f6feb; color: #fff; }
+
+/* --- user-form --- */
+.user-form { display: grid; grid-template-columns: auto 1fr; gap: .6rem 1rem; align-items: center; padding: 1rem; border-radius: .6rem; background: #fff; }
+.user-form__input { font: inherit; padding: .3rem .5rem; }
+.user-form__dropzone { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; padding: .5rem; border: 2px dashed #d1d9e0; border-radius: .6rem; }
+.user-form__dropzone--over { border-color: #1f6feb; background: #ddf4ff; }
+.user-form__preview { width: 3rem; height: 3rem; border-radius: 50%; }
+.user-form__hint { color: #59636e; font-size: .875rem; }
+.user-form__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .5rem; }
+
+/* --- toolbar --- */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-block: 1rem; }
+.toolbar__search { font: inherit; padding: .3rem .5rem; }
+.toolbar__counter { color: #59636e; }
+.toolbar__field--danger { color: #cf222e; }
+
+/* --- user-list / user-card --- */
+.user-list { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
+.user-list__empty { color: #59636e; }
+
+.user-card { display: flex; align-items: center; gap: 1rem; padding: .6rem 1rem; border-radius: .6rem; background: #fff; }
+.user-card--favorite { outline: 2px solid #d4a72c; }
+.user-card__photo, .user-card__initials { flex: none; width: 3rem; height: 3rem; border-radius: 50%; }
+.user-card__initials { display: grid; place-items: center; color: #fff; font-weight: 700; background: hsl(var(--hue, 210) 55% 45%); }
+.user-card__body { flex: 1; }
+.user-card__name { margin: 0; font-size: 1.1rem; }
+.user-card__meta { margin: 0; color: #59636e; font-size: .875rem; }
+.user-card__button { border: 0; background: none; font-size: 1.4rem; cursor: pointer; }
