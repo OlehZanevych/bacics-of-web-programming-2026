@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Подорож події: занурення, ціль, спливання</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Звичайний скрипт з defer: виконається після побудови DOM.
+         Працює і через file:// — можна відкрити index.html подвійним кліком. -->
+    <script src="js/main.js" defer></script>
+</head>
+
+<!-- Розмітка майже порожня: вкладені блоки, панель налаштувань і журнал
+     будує JavaScript (js/main.js). Відкрийте DevTools → Elements, щоб
+     побачити, яке дерево DOM вийшло. -->
+<body class="page">
+<header class="page__header">
+    <h1 class="page__title">Подорож події</h1>
+    <p class="page__subtitle">
+        Клацніть будь-де всередині блоків і простежте шлях події:
+        <span class="legend legend--capturing">1 · занурення</span>
+        <span class="legend legend--target">2 · ціль</span>
+        <span class="legend legend--bubbling">3 · спливання</span>
+    </p>
+</header>
+
+<main class="page__main">
+    <form class="controls" id="controls" aria-label="Налаштування експерименту"></form>
+    <div class="workbench">
+        <div class="stage" id="stage"></div>
+        <section class="event-log" aria-live="polite">
+            <p class="event-log__route" id="route">Маршрут події з'явиться після кліку.</p>
+            <ol class="event-log__list" id="log"></ol>
+        </section>
+    </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Картки користувачів (класичні скрипти) — форма, стан, DOM</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Класичні скрипти з defer: завантажуються паралельно, виконуються
+         після побудови DOM і СТРОГО в порядку появи тегів.
+         Працюють навіть через file:// — сторінку можна відкрити подвійним
+         кліком по index.html, без сервера.
+
+         Ціна: немає import/export, тож скрипти спілкуються через глобальний
+         об'єкт App, і main.js мусить стояти ОСТАННІМ.
+         🧪 Перенесіть main.js на початок списку й подивіться в консоль. -->
+    <script src="js/state.js" defer></script>
+    <script src="js/storage.js" defer></script>
+    <script src="js/photo.js" defer></script>
+    <script src="js/render.js" defer></script>
+    <script src="js/main.js" defer></script>
+</head>
+
+<body class="page">
+<header class="page__header">
+    <h1 class="page__title">Картки користувачів</h1>
+    <p class="page__subtitle">форма → стан → рендеринг DOM → localStorage</p>
+    <p class="page__badge">Варіант 1 · класичні скрипти <code>&lt;script defer&gt;</code> · відкривається без сервера</p>
+</header>
+
+<main class="page__main">
+    <!-- Уся розмітка форми — звичайний HTML. Поведінку додає JS. -->
+    <form class="user-form" id="user-form" autocomplete="off">
+        <label class="user-form__label" for="first-name">Ім'я</label>
+        <input class="user-form__input" id="first-name" name="firstName" required maxlength="60">
+
+        <label class="user-form__label" for="last-name">Прізвище</label>
+        <input class="user-form__input" id="last-name" name="lastName" required maxlength="60">
+
+        <label class="user-form__label" for="role">Роль</label>
+        <select class="user-form__input" id="role" name="role">
+            <option>Студент</option>
+            <option>Викладач</option>
+            <option>Аспірант</option>
+        </select>
+
+        <label class="user-form__label" for="photo">Фото</label>
+        <div class="user-form__dropzone" id="dropzone">
+            <img class="user-form__preview" id="photo-preview" alt="Попередній перегляд фото" hidden>
+            <input class="user-form__input" id="photo" name="photo" type="file" accept="image/*">
+            <span class="user-form__hint">або перетягніть файл сюди</span>
+        </div>
+
+        <div class="user-form__actions">
+            <button class="button button--primary" type="submit">Додати</button>
+            <button class="button" type="button" data-action="random">Випадковий</button>
+            <button class="button" type="button" data-action="xss">XSS-атака</button>
+            <button class="button" type="reset">Очистити форму</button>
+        </div>
+    </form>
+
+    <section class="toolbar" aria-label="Пошук і налаштування">
+        <label class="toolbar__field">
+            Пошук <kbd>/</kbd>
+            <input class="toolbar__search" id="search" type="search" placeholder="Ім'я або прізвище">
+        </label>
+        <output class="toolbar__counter" id="counter"></output>
+        <label class="toolbar__field toolbar__field--danger">
+            <input id="unsafe" type="checkbox">
+            небезпечний рендеринг через innerHTML
+        </label>
+        <button class="button" type="button" id="clear-all">Видалити всіх</button>
+    </section>
+
+    <ul class="user-list" id="user-list"></ul>
+    <p class="user-list__empty" id="empty-message" hidden></p>
+</main>
+
+<!-- <template> браузер розбирає, але НЕ показує. JS клонує його для кожної
+     картки. Зверніть увагу: тут немає жодного обробника onclick — усі кліки
+     ловить ОДИН обробник на <ul> (делегування подій). -->
+<template id="user-card-template">
+    <li class="user-card">
+        <img class="user-card__photo" alt="" hidden>
+        <span class="user-card__initials" aria-hidden="true"></span>
+        <div class="user-card__body">
+            <h2 class="user-card__name" title="Двічі клацніть, щоб редагувати"></h2>
+            <p class="user-card__meta"></p>
+        </div>
+        <button class="user-card__button" type="button" data-action="favorite" aria-pressed="false"
+                aria-label="Додати в обрані">☆</button>
+        <button class="user-card__button" type="button" data-action="delete" aria-label="Видалити">×</button>
+    </li>
+</template>
+</body>
+</html>

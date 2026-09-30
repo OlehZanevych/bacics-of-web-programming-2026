@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Перетягувані вікна на Pointer Events</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Звичайні скрипти з defer виконуються в порядку появи: спершу drag.js
+         (оголошує функцію enableDragging), потім main.js, який її використовує.
+         Працюють і через file:// — можна відкрити index.html подвійним кліком. -->
+    <script src="js/drag.js" defer></script>
+    <script src="js/main.js" defer></script>
+</head>
+
+<body class="page">
+<header class="toolbar">
+    <h1 class="toolbar__title">Перетягувані вікна</h1>
+    <button class="toolbar__button" type="button" data-action="add">+ Нове вікно <kbd>N</kbd></button>
+    <button class="toolbar__button" type="button" data-action="arrange">Упорядкувати</button>
+    <button class="toolbar__button" type="button" data-action="close-all">Закрити всі</button>
+    <p class="toolbar__hint">
+        Тягніть за заголовок · подвійний клік по заголовку — розгорнути ·
+        <kbd>Tab</kbd> + стрілки (<kbd>Shift</kbd> — швидше) · <kbd>Esc</kbd> — закрити
+    </p>
+</header>
+
+<!-- «Лабораторія»: перемикачі будує JS. Вимикайте їх по одному й дивіться,
+     як саме ламається перетягування (лекція 4, розділ 11.4). -->
+<details class="lab" open>
+    <summary class="lab__summary">Лабораторія: вимкни — і подивись, що зламається</summary>
+    <form class="lab__options" id="lab"></form>
+    <pre class="lab__debug" id="debug">Почніть тягнути вікно — тут з'являться координати.</pre>
+</details>
+
+<main class="desktop" id="desktop"></main>
+</body>
+</html>
