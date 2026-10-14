@@ -1,0 +1,12 @@
+.list {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.empty {
+    padding: 1.5rem 1rem;
+    border: 1px dashed var(--color-border);
+    border-radius: 0.5rem;
+    color: var(--color-muted);
+    text-align: center;
+}

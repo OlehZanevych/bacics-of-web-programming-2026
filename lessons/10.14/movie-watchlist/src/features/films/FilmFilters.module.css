@@ -1,0 +1,12 @@
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Обрана кнопка: стан беремо з ARIA-атрибута, а не з окремого класу */
+.filter[aria-pressed='true'] {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+}
