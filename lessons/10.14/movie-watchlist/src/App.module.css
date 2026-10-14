@@ -1,0 +1,33 @@
+/* Mobile first: базові правила — один стовпчик для телефона */
+.app {
+    max-width: 64rem; /* 1024px */
+    margin-inline: auto;
+    padding: 1.5rem 1rem 3rem;
+}
+
+.header {
+    margin-bottom: 1.5rem;
+}
+
+.title {
+    font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.5rem); /* 28px … 40px */
+    line-height: 1.2;
+}
+
+.subtitle {
+    color: var(--color-muted);
+}
+
+.layout {
+    display: grid;
+    gap: 1rem;
+}
+
+/* Планшет і ширше: форма ліворуч, список праворуч */
+@media (min-width: 48rem) {
+    .layout {
+        grid-template-columns: 18rem minmax(0, 1fr); /* 288px | решта */
+        align-items: start;
+        gap: 1.5rem;
+    }
+}

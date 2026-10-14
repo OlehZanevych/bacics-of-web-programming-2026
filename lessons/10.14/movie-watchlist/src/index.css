@@ -1,0 +1,46 @@
+/* Глобальні стилі: кольори, скидання, базова типографіка.
+   Усе, що стосується одного компонента, живе в його *.module.css. */
+
+:root {
+  --color-bg: #f2f5f8;
+  --color-surface: #ffffff;
+  --color-text: #16191d;
+  --color-muted: #576270;
+  --color-border: #d8e0e8;
+  --color-accent: #123b6d;
+  --color-accent-hover: #0d2c52;
+  --color-accent-soft: #e7eef7;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+  --radius: 0.75rem; /* 12px */
+
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body,
+h1,
+h2,
+p,
+ul {
+  margin: 0;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+/* Поля й кнопки за замовчуванням мають власний шрифт браузера */
+button,
+input {
+  font: inherit;
+}
