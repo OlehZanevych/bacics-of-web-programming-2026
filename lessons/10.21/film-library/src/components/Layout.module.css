@@ -1,0 +1,94 @@
+/* Шапка — підвал завжди внизу, навіть на короткій сторінці */
+.layout {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    /* minmax(0, 1fr): колонка не розширюється під довгий вміст (меню прокручується) */
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 100dvh;
+}
+
+/* Телефон: логотип і перемикач теми в першому рядку, меню — у другому */
+.header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.logo {
+    margin-right: auto; /* відштовхує все інше праворуч */
+    color: var(--color-text);
+    font-size: 1.25rem;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.nav {
+    order: 1; /* після перемикача теми */
+    flex-basis: 100%;
+}
+
+.navList {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+}
+
+.navLink {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    color: var(--color-text);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.navLink:hover {
+    background: var(--color-bg);
+}
+
+.active {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+.themeToggle {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    background: var(--color-surface);
+    font-size: 1.125rem;
+    cursor: pointer;
+}
+
+.main {
+    width: 100%;
+    max-width: 64rem; /* 1024px */
+    margin-inline: auto;
+    padding: 1.5rem 1rem 3rem;
+}
+
+.footer {
+    padding: 1.5rem 1rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+/* Планшет і ширше: усе в один рядок */
+@media (min-width: 48rem) {
+    .header {
+        padding-inline: 2rem;
+    }
+
+    .nav {
+        order: 0;
+        flex-basis: auto;
+    }
+}
