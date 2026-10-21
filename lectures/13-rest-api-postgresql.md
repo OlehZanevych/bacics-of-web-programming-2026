@@ -153,10 +153,13 @@ PATCH /api/v1/movies/42
 const fields = [];
 const params = [];
 
-for (const key of ['title', 'year', 'description', 'genre_id']) {
+// поле API (camelCase) → стовпець бази (snake_case); заодно білий список
+const COLUMNS = { title: 'title', year: 'year', description: 'description', genreId: 'genre_id' };
+
+for (const [key, column] of Object.entries(COLUMNS)) {
   if (Object.hasOwn(data, key)) {      // саме hasOwn, не перевірка істинності
     params.push(data[key]);
-    fields.push(`${key} = $${params.length}`);
+    fields.push(`${column} = $${params.length}`);
   }
 }
 
@@ -177,8 +180,9 @@ if (fields.length === 0) throw new ValidationError('Немає полів для
 `DELETE` після мережевого збою, а `POST` — ні (створяться дублікати).
 
 Щодо `DELETE` неіснуючого ресурсу є два підходи: повертати `404` (ресурсу
-немає — чесно) або `204` (кінцевий стан досягнуто — суворіша ідемпотентність).
-Завдання №4 вимагає `404`.
+немає — чесно) або `204` (кінцевий стан досягнуто). Обидва варіанти
+ідемпотентні: ідемпотентність стосується стану сервера, а не коду відповіді
+(RFC 9110, §9.2.2). Завдання №4 вимагає `404`.
 
 ---
 
@@ -343,7 +347,8 @@ const sortOrder = query.order === 'desc' ? 'DESC' : 'ASC';
 | Розширення | PostGIS, pgvector, TimescaleDB |
 | Повнотекстовий пошук | вбудований, з підтримкою мов |
 
-Актуальна мажорна версія — **PostgreSQL 18**; підтримка кожної триває 5 років.
+Актуальна мажорна версія — **PostgreSQL 18** (PostgreSQL 19 станом на жовтень
+2026 — на стадії release candidate); підтримка кожної триває 5 років.
 
 **Реляційна база чи NoSQL?** Для нашої задачі (фільми ↔ жанри, чіткі зв'язки,
 потрібні `JOIN` і цілісність) реляційна модель — очевидний вибір. MongoDB
@@ -368,7 +373,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql      # для образів 18+; для ≤17 було …/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U movies"]
       interval: 5s
@@ -438,7 +443,7 @@ CREATE TABLE movies (
 
 | Тип | Коли |
 |---|---|
-| `SERIAL` / `IDENTITY` | автоінкремент; читабельні id |
+| `SERIAL` / `GENERATED … AS IDENTITY` | автоінкремент; читабельні id |
 | `UUID` | ідентифікатори, які можна генерувати на клієнті; не розкривають кількість записів |
 | `VARCHAR(n)` | текст із розумним обмеженням |
 | `TEXT` | текст без обмеження (у Postgres не повільніший!) |
@@ -450,11 +455,18 @@ CREATE TABLE movies (
 | `TIMESTAMPTZ` | **завжди для моментів часу** |
 | `JSONB` | напівструктуровані дані з індексами |
 
+💡 Для нових таблиць вікі PostgreSQL радить стандартний
+`INTEGER GENERATED ALWAYS AS IDENTITY` замість `SERIAL` (див. «Don't Do This»
+у §22). А в PostgreSQL 18 з'явилася функція `uuidv7()`: такі UUID упорядковані
+за часом створення, тому краще поводяться в індексах, ніж випадкові
+`gen_random_uuid()` (v4), — але розкривають момент створення запису.
+
 ⚠️ **`NUMERIC`, а не `REAL`, для грошей.** `REAL` — число з рухомою комою, і
 0.1 + 0.2 там теж не дорівнює 0.3 (лекція 3).
 
-⚠️ **`TIMESTAMPTZ`, а не `TIMESTAMP`.** Перший зберігає момент часу з
-урахуванням зони, другий — «настінний час» без прив'язки. Використання
+⚠️ **`TIMESTAMPTZ`, а не `TIMESTAMP`.** Перший зберігає абсолютний момент
+часу (зону вхідного значення враховує й переводить в UTC, хоча саму зону не
+зберігає), другий — «настінний час» без прив'язки. Використання
 `TIMESTAMP` майже завжди виявляється помилкою при першій же зміні часового
 поясу чи розгортанні сервера в іншому регіоні.
 
@@ -506,7 +518,7 @@ genre_id INTEGER REFERENCES genres(id) ON DELETE SET NULL
 
 | Варіант | Що станеться при видаленні жанру |
 |---|---|
-| `RESTRICT` (за замовчуванням) | заборонити, якщо є пов'язані фільми |
+| `NO ACTION` (за замовчуванням) / `RESTRICT` | заборонити, якщо є пов'язані фільми |
 | `CASCADE` | видалити й усі фільми ⚠️ обережно! |
 | `SET NULL` | у фільмів `genre_id` стане `NULL` |
 | `SET DEFAULT` | підставити значення за замовчуванням |
@@ -638,6 +650,8 @@ export const pool = new Pool({
   max: 10,                          // максимум з'єднань
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
+  // ⚠️ rejectUnauthorized: false вимикає перевірку сертифіката сервера;
+  //    якщо провайдер дає CA-сертифікат, краще ssl: { ca: config.dbCaCert }
   ssl: config.isProduction ? { rejectUnauthorized: false } : false,
 });
 
@@ -705,7 +719,8 @@ const { rows } = await pool.query(
 й напрямок сортування підставляються в текст запиту:
 
 ```js
-// ❌ Не працює — синтаксична помилка
+// ❌ Не працює — і навіть без помилки: $1 стане константою-рядком 'title',
+//    тож сортування мовчки не відбудеться
 await pool.query('SELECT * FROM movies ORDER BY $1', [sortField]);
 
 // ✅ Білий список
@@ -826,8 +841,9 @@ export async function findAll({ filters, sort, order, limit, offset }) {
 сповільнення записів.
 
 ```sql
--- Пошук за назвою
-CREATE INDEX idx_movies_title ON movies (title);
+-- Пошук за назвою: окремий індекс НЕ потрібен — його вже створило
+-- обмеження movies_title_unique (UNIQUE (title)); цей лише дублював би його
+-- CREATE INDEX idx_movies_title ON movies (title);
 
 -- Зовнішній ключ — індексується ЗАВЖДИ
 CREATE INDEX idx_movies_genre_id ON movies (genre_id);
@@ -1000,6 +1016,7 @@ movies.rows.forEach(m => { m.genre = genreMap.get(m.genre_id) ?? null; });
 ```js
 // scripts/seed.js
 import { pool } from '../src/db/pool.js';
+import slugify from '@sindresorhus/slugify';     // npm install -D @sindresorhus/slugify
 
 const GENRES = ['Драма', 'Комедія', 'Трилер', 'Документальний', 'Анімація',
                 'Історичний', 'Фантастика', 'Пригоди', 'Мелодрама', 'Жахи'];
@@ -1056,7 +1073,8 @@ seed().catch(error => {
 🔑 Одна багаторядкова вставка замість 200 окремих — на порядок швидше.
 
 Бібліотека [`@faker-js/faker`](https://fakerjs.dev/) уміє генерувати
-реалістичні дані, зокрема українською (`faker.locale = 'uk'`).
+реалістичні дані, зокрема українською
+(`import { fakerUK as faker } from '@faker-js/faker'`).
 
 ---
 
@@ -1187,7 +1205,8 @@ seed().catch(error => {
    Основне джерело; розділи про типи даних, індекси й планувальник запитів.
 2. **Brown, E.** *Web Development with Node and Express.* 2nd ed. —
    O'Reilly, 2019. — Розділи про роботу з базами даних і REST API.
-3. **Kleppmann, M.** *Designing Data-Intensive Applications.* — O'Reilly, 2017. —
+3. **Kleppmann, M.** *Designing Data-Intensive Applications.* — O'Reilly, 2017
+   (2-ге вид., у співавторстві з C. Riccomini, — 2026). —
    Глибоке пояснення транзакцій, індексів, реплікації. Складна, але одна з
    найкращих книг у галузі.
 4. **Fowler, M.** *Patterns of Enterprise Application Architecture.* —

@@ -333,12 +333,14 @@ const ok = results.filter(r => r.status === 'fulfilled').map(r => r.value);
 const failed = results.filter(r => r.status === 'rejected');
 
 // race — тайм-аут
-const withTimeout = (promise, ms) => Promise.race([
-  promise,
-  new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Час очікування вичерпано')), ms)
-  ),
-]);
+const withTimeout = (promise, ms) => {
+  let timerId;
+  const timeout = new Promise((_, reject) => {
+    timerId = setTimeout(() => reject(new Error('Час очікування вичерпано')), ms);
+  });
+  return Promise.race([promise, timeout])
+    .finally(() => clearTimeout(timerId));   // не лишаємо «висячий» таймер (розділ 12)
+};
 ```
 
 ---
@@ -487,6 +489,11 @@ const signal = AbortSignal.any([
   AbortSignal.timeout(5000),
 ]);
 ```
+
+💡 Після тайм-ауту `fetch` відхиляється з `error.name === 'TimeoutError'`, а
+не `'AbortError'`. Тож перевірка `if (error.name === 'AbortError') return;`
+(розділ 7.1) його не «проковтне» — і правильно: про тайм-аут користувачеві
+треба сказати.
 
 ### 7.4. Повторні спроби
 
@@ -693,7 +700,10 @@ app.use(cors({ origin: 'http://localhost:5173' }));
 ```
 
 **Попередній запит (preflight).** Для «непростих» запитів (методи `PUT`,
-`PATCH`, `DELETE` або власні заголовки на кшталт `Authorization`) браузер
+`PATCH`, `DELETE`, власні заголовки на кшталт `Authorization` або
+`Content-Type`, відмінний від `text/plain`, `multipart/form-data` і
+`application/x-www-form-urlencoded`, — тобто й звичайний `POST` з
+`application/json`) браузер
 спочатку надсилає `OPTIONS` і лише після дозволу — сам запит. Тому в
 Network ви побачите два записи замість одного.
 

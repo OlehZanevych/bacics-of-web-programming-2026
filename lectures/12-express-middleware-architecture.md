@@ -415,7 +415,7 @@ Middleware з **чотирма** параметрами Express розпізна
 
 ```js
 // src/middlewares/errorHandler.js
-import { AppError } from '../errors/index.js';
+import { AppError, NotFoundError } from '../errors/index.js';
 import { config } from '../config/index.js';
 
 export function notFoundHandler(req, res, next) {
@@ -426,7 +426,8 @@ export function errorHandler(error, req, res, next) {
   // Помилка вже після початку відповіді — делегуємо Express
   if (res.headersSent) return next(error);
 
-  const isOperational = error instanceof AppError;
+  // expose: true мають помилки express.json(): битий JSON → 400, завелике тіло → 413
+  const isOperational = error instanceof AppError || error.expose === true;
   const status = isOperational ? error.status : 500;
 
   // Логуємо: очікувані — коротко, неочікувані — з трасуванням
@@ -464,7 +465,8 @@ app.use(errorHandler);
 автоматично:
 
 ```js
-// ❌ В Express 4 сервер «зависне»
+// ❌ В Express 4 помилка не дійде до errorHandler: це unhandled rejection,
+//    і з Node.js 15+ увесь процес сервера аварійно завершиться
 app.get('/api/movies/:id', async (req, res) => {
   const movie = await service.getById(req.params.id);   // кине помилку
   res.json(movie);
@@ -569,7 +571,7 @@ export async function findAll({ filters = {}, sort = 'title', order = 'asc', lim
        FROM movies m
        LEFT JOIN genres g ON g.id = m.genre_id
        ${clause}
-      ORDER BY m.${sortField} ${sortOrder}
+      ORDER BY m.${sortField} ${sortOrder}, m.id
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
@@ -634,6 +636,11 @@ export async function list(query) {
   ]);
 
   return { data: rows.map(toMovieResponse), total, limit, offset };
+}
+
+export async function count(query) {
+  const { search, genreId, yearFrom, yearTo } = query;
+  return repository.count({ search, genreId, yearFrom, yearTo });
 }
 
 export async function getById(id) {
@@ -922,13 +929,13 @@ router.post('/:id/poster', authenticate, upload.single('poster'), controller.upl
 
 ## 11. Express 5: що змінилося
 
-Express 5 — актуальна стабільна гілка (5.2.x станом на 2026 рік).
+Express 5 — актуальна стабільна гілка (5.3.x станом на жовтень 2026 року).
 
 | Зміна | Було (4) | Стало (5) |
 |---|---|---|
 | Асинхронні помилки | губилися, потрібен `asyncHandler` | **обробляються автоматично** |
 | Шаблони маршрутів | `path-to-regexp` v0 | v8: `*` став `*name`, `:id?` став `{/:id}` |
-| `req.query` | завжди розбирався `qs` | простіший розбір, налаштовується |
+| `req.query` | за замовчуванням розбирався `qs` (`a[b]=1` → вкладений об'єкт) | за замовчуванням простий розбір (без вкладених об'єктів), налаштовується; `req.query` — лише для читання (getter) |
 | Мінімальна версія Node | 0.10+ | 18+ |
 | Викинуті методи | `res.send(status)`, `app.del()` | видалено |
 
@@ -940,7 +947,8 @@ app.get('/files/*', handler);
 app.get('/movies/:id?', handler);
 
 // Express 5
-app.get('/files/*path', handler);        // req.params.path
+app.get('/files/*path', handler);        // req.params.path — масив: ['a', 'b.txt']
+                                         // (сам '/files/' не збігається; для нього — '/files{/*path}')
 app.get('/movies{/:id}', handler);
 ```
 
@@ -953,7 +961,7 @@ app.get('/movies{/:id}', handler);
 | Фреймворк | Особливості | Коли обрати |
 |---|---|---|
 | **Express** | найпоширеніший, мінімалістичний, величезна екосистема | навчання, більшість проєктів |
-| **Fastify** | у 2–3 рази швидший, вбудована валідація схемами й генерація OpenAPI | коли важлива продуктивність |
+| **Fastify** | у 2–3 рази швидший, вбудована валідація схемами, генерація OpenAPI (офіційний плагін `@fastify/swagger`) | коли важлива продуктивність |
 | **Koa** | від авторів Express, сучасніший, дуже мінімальний | коли хочеться будувати все самому |
 | **NestJS** | повноцінний фреймворк: DI, декоратори, модулі, TypeScript | великі команди; ідейно схожий на Spring |
 | **Hono** | ультралегкий, працює на Node, Deno, Bun, edge-середовищах | serverless, edge |

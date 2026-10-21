@@ -531,8 +531,8 @@ event.isPrimary                  // головний вказівник (важ�
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') closeModal();
   if (event.key === 'Delete') deleteActive();
-  if (event.key === 'n' && !isTyping(event.target)) createNote();
-  if (event.ctrlKey && event.key === 'z') undo();
+  if (event.code === 'KeyN' && !isTyping(event.target)) createNote();
+  if (event.ctrlKey && event.code === 'KeyZ') undo();
   if (event.key === 'Enter' && event.ctrlKey) save();
 });
 ```
@@ -551,7 +551,8 @@ document.addEventListener('keydown', (event) => {
 
 ```js
 function isTyping(el) {
-  return el.matches('input, textarea, [contenteditable="true"]');
+  // isContentEditable враховує і "true", і "plaintext-only" (розділ 12.2)
+  return el.matches('input, textarea, select') || el.isContentEditable;
 }
 ```
 
@@ -684,6 +685,9 @@ export function makeDraggable(element, { handle, bounds, onDrop }) {
   function onPointerDown(event) {
     // Тільки основна кнопка й основний вказівник
     if (event.button !== 0 || !event.isPrimary) return;
+    // Кнопки в «ручці» мають лишатися клікабельними: після setPointerCapture
+    // click прийшов би на ручку, а не на кнопку, і делегування його б не впізнало
+    if (event.target.closest('button')) return;
 
     const elementRect = element.getBoundingClientRect();
     const boundsRect = bounds.getBoundingClientRect();
@@ -698,8 +702,9 @@ export function makeDraggable(element, { handle, bounds, onDrop }) {
     element.classList.add('note--dragging');
     handleEl.setPointerCapture(event.pointerId);   // події йтимуть сюди навіть поза елементом
 
-    let lastX = 0;
-    let lastY = 0;
+    // Поточна позиція — щоб клік без руху не «телепортував» стікер у (0, 0)
+    let lastX = elementRect.left - boundsRect.left;
+    let lastY = elementRect.top - boundsRect.top;
 
     document.addEventListener('pointermove', onPointerMove, { signal });
     document.addEventListener('pointerup', onPointerUp, { signal });
@@ -796,7 +801,12 @@ function startEditing(noteEl, note) {
   autoGrow(textarea);
   textarea.addEventListener('input', () => autoGrow(textarea));
 
+  let finished = false;
   const finish = (save) => {
+    // replaceWith прибирає textarea з фокусом і викликає blur → finish(true);
+    // без цього прапорця Escape однаково зберіг би текст
+    if (finished) return;
+    finished = true;
     const newText = textarea.value.trim();
     textarea.replaceWith(textEl);
     if (save) {
@@ -909,7 +919,7 @@ export const saveNotesDebounced = debounce(saveNotes, 300);
 ```js
 window.addEventListener('storage', (event) => {
   if (event.key === KEY) {
-    render(JSON.parse(event.newValue ?? '[]'));
+    render(loadNotes());   // та сама безпечна обгортка, а не «голий» JSON.parse
   }
 });
 ```
@@ -956,7 +966,9 @@ mo.observe(board, { childList: true, subtree: true });
 ```
 
 🔑 `IntersectionObserver` замінює старий підхід із `scroll` + перевіркою
-координат: він працює поза головним потоком і не гальмує прокрутку.
+координат: браузер сам перевіряє перетин під час рендерингу й викликає колбек
+асинхронно (не на кожну подію `scroll`), без примусового перерахунку макета,
+тому прокрутка не гальмує.
 
 ---
 

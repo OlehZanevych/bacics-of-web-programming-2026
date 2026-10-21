@@ -637,11 +637,15 @@ dist/
 <p>Виділено: <mark>знайдений збіг</mark>.</p>
 <p>Було <del>100 грн</del>, стало <ins>80 грн</ins>.</p>
 
-<blockquote cite="https://example.com/article">
-  <p>Будь-який дурень може написати код, зрозумілий комп'ютеру. Хороші
-     програмісти пишуть код, зрозумілий людям.</p>
-  <footer>— <cite>Мартін Фаулер, «Рефакторинг»</cite></footer>
-</blockquote>
+<!-- Атрибуцію за специфікацією розміщують ПОЗА <blockquote>,
+     а <cite> позначає назву твору, а не ім'я людини -->
+<figure>
+  <blockquote cite="https://example.com/article">
+    <p>Будь-який дурень може написати код, зрозумілий комп'ютеру. Хороші
+       програмісти пишуть код, зрозумілий людям.</p>
+  </blockquote>
+  <figcaption>— Мартін Фаулер, <cite>«Рефакторинг»</cite></figcaption>
+</figure>
 
 <pre><code>function greet(name) {
   return `Привіт, ${name}!`;
@@ -756,11 +760,13 @@ dist/
      alt="Панорама Львова з Високого замку"
      width="1600" height="900">
 
-<!-- Різні ЗОБРАЖЕННЯ або формати: обирає розробник -->
+<!-- Різні ЗОБРАЖЕННЯ або формати: обирає розробник.
+     Браузер бере ПЕРШИЙ відповідний <source>, тому умова media — першою:
+     інакше будь-який браузер із підтримкою AVIF ніколи до неї не дійде -->
 <picture>
+  <source media="(max-width: 600px)" srcset="hero-mobile.jpg">
   <source srcset="hero.avif" type="image/avif">
   <source srcset="hero.webp" type="image/webp">
-  <source media="(max-width: 600px)" srcset="hero-mobile.jpg">
   <img src="hero.jpg" alt="Робоче місце розробника" width="1200" height="800">
 </picture>
 ```
@@ -888,6 +894,8 @@ dist/
 </details>
 
 <!-- Діалогове вікно (нативне, з фокус-пасткою) -->
+<!-- Відкрити без JS: атрибути command/commandfor (Baseline з грудня 2025) -->
+<button commandfor="modal" command="show-modal">Відкрити</button>
 <dialog id="modal">
   <p>Вміст модального вікна</p>
   <form method="dialog"><button>Закрити</button></form>
@@ -978,7 +986,7 @@ dist/
 ### 9.1. Базова структура
 
 ```html
-<form action="/subscribe" method="post" novalidate>
+<form action="/subscribe" method="post">
   <fieldset>
     <legend>Зворотний зв'язок</legend>
 
@@ -1163,7 +1171,7 @@ input:focus-visible       { outline: 2px solid var(--color-accent); outline-offs
 3. **`alt` для всіх зображень.**
 4. **`<label>` для всіх полів форми.**
 5. **Контраст ≥ 4.5:1** для звичайного тексту, ≥ 3:1 для великого (від 24 px
-   або 19 px напівжирного) та для меж елементів керування.
+   або ≈18.7 px напівжирного, тобто 18 pt / 14 pt) та для меж елементів керування.
 6. **Видимий фокус:**
 
    ```css
@@ -1520,6 +1528,10 @@ nav ul li a      { background: red;  }   /* (0,0,4) */
 означає, що утилітарний клас `.mt-0` переб'є `.card .header .title`, і жодних
 `!important` не потрібно.
 
+> ⚠️ Стилі, написані **поза будь-яким шаром**, перемагають усі шари (вони
+> вважаються «останнім» шаром). А для `!important` порядок шарів обернений:
+> важливе оголошення з **ранішого** шару сильніше.
+
 ### 13.5. Успадкування
 
 Частина властивостей передається дітям автоматично:
@@ -1544,7 +1556,7 @@ nav ul li a      { background: red;  }   /* (0,0,4) */
 Класичний практичний прийом:
 
 ```css
-/* Посилання й кнопки НЕ успадковують шрифт автоматично — задамо явно */
+/* Елементи форм (кнопки, поля) НЕ успадковують шрифт автоматично — задамо явно */
 button, input, select, textarea {
   font: inherit;
   color: inherit;
@@ -1703,11 +1715,13 @@ button, input, select, textarea {
 
 🔑 **Чому `rem`, а не `px`.** Якщо користувач збільшив базовий розмір шрифту в
 налаштуваннях браузера (а так роблять люди зі слабким зором), розміри в `rem`
-масштабуються разом із ним, а в `px` — ні. Це вимога WCAG.
+масштабуються разом із ним, а в `px` — ні. Це важливо для доступності
+(пор. критерій WCAG 1.4.4 «Зміна розміру тексту»).
 
 ⚠️ **Пастка `em`:** вони множаться. Якщо `.parent { font-size: 1.2em }` і
 всередині `.child { font-size: 1.2em }`, дитина отримає 1.44 від початкового.
-У вкладених списках це дає ефект «шрифт зникає». `rem` цієї проблеми не має.
+У вкладених списках це дає ефект «шрифт роздувається» (а з `0.8em` —
+«шрифт зникає»). `rem` цієї проблеми не має.
 
 ⚠️ **Пастка `100vh` на мобільних:** адресний рядок то з'являється, то зникає, і
 секція «на весь екран» стрибає. Використовуйте `100dvh`.
@@ -1817,7 +1831,7 @@ p {
 ```css
 @font-face {
   font-family: "Inter";
-  src: url("../fonts/inter-var.woff2") format("woff2-variations");
+  src: url("../fonts/inter-var.woff2") format("woff2");  /* "woff2-variations" — застарілий запис */
   font-weight: 100 900;      /* варіативний шрифт: увесь діапазон */
   font-display: swap;        /* показати текст запасним шрифтом, поки вантажиться */
 }
@@ -2079,7 +2093,7 @@ ul[class], ol[class] { list-style: none; padding: 0; }
 7. Чому анімувати `transform` дешевше, ніж `left`?
 8. Що потрапляє в Render Tree, а що ні? Чим у цьому сенсі `display: none`
    відрізняється від `visibility: hidden`?
-9. Назвіть чотири переваги правильного `<label>`.
+9. Назвіть три переваги правильного `<label>`.
 10. Обчисліть специфічність: `#main .list li a:hover`. Чи переможе вона
     `.nav__link--active`?
 11. Що зробить `:where(article, aside) p { color: gray }` і чим це відрізняється
@@ -2164,8 +2178,9 @@ Checker — обидві пари мають давати ≥ 4.5:1.
 
 ### Основне (додайте до закладок)
 
-- [MDN Web Docs — HTML](https://developer.mozilla.org/uk/docs/Web/HTML) —
-  довідник з усіх елементів. Частина сторінок є українською.
+- [MDN Web Docs — HTML](https://developer.mozilla.org/en-US/docs/Web/HTML) —
+  довідник з усіх елементів. Українською MDN не перекладається; переклад частини
+  сторінок робить спільнота [WebDoky](https://webdoky.org/uk/docs/Web/HTML/).
 - [MDN Web Docs — CSS](https://developer.mozilla.org/en-US/docs/Web/CSS) —
   довідник з усіх властивостей, із прикладами й позначками Baseline.
 - [MDN Learn: Structuring content with HTML](https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Structuring_content) —
@@ -2263,7 +2278,7 @@ Checker — обидві пари мають давати ≥ 4.5:1.
 | Перекомпонування | reflow / layout | Перерахунок геометрії елементів |
 | Перемальовування | repaint | Повторне малювання без зміни геометрії |
 | Стрибок верстки | layout shift | Зміщення вмісту після завантаження (метрика CLS) |
-| Роздільна здатність незалежна | device pixel ratio | Співвідношення фізичних і CSS-пікселів |
+| Щільність пікселів (DPR) | device pixel ratio | Співвідношення фізичних і CSS-пікселів |
 | Брейкпойнт | breakpoint | Ширина, на якій змінюється макет |
 | Ідемпотентність | idempotence | Повторний запит дає той самий результат |
 | Кодування | character encoding | Правило перетворення байтів на символи (UTF-8) |

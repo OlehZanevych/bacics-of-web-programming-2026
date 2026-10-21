@@ -163,7 +163,7 @@
 
 ```html
 <div class="a">           <!-- z-index: 1, створює контекст -->
-  <div class="a-child">   <!-- z-index: 9999 -->
+  <div class="a-child"></div>   <!-- z-index: 9999 -->
 </div>
 <div class="b"></div>     <!-- z-index: 2 -->
 ```
@@ -531,8 +531,9 @@ grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
    найважливіше — і це корисна дисципліна для дизайну.
 3. **Код виходить простішим.** Мобільний макет зазвичай однією колонкою — це
    майже нормальний потік, тобто мінімум CSS. Ускладнення додаються поступово.
-4. **Продуктивність:** мобільні пристрої не завантажують стилі, призначені для
-   десктопу (якщо використовувати `min-width`).
+4. **Менше перевизначень:** мобільний пристрій застосовує лише базові стилі й
+   не мусить «скасовувати» десктопні (сам CSS-файл, утім, завантажується
+   повністю — медіа-запити не скасовують його завантаження).
 
 ```css
 /* ❌ Desktop first: складне спочатку, потім розбираємо */
@@ -634,15 +635,24 @@ grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
 
 /* Десктоп: «розгортаємо» назавжди й ховаємо кнопку */
 @media (min-width: 768px) {
-  .site-nav__toggle { display: none; }
-
   .site-nav__disclosure > .site-nav__list {
     display: flex;
     flex-direction: row;
     gap: var(--space-4);
   }
-  /* details у відкритому стані незалежно від атрибута open */
-  .site-nav__disclosure { display: contents; }
+
+  /* details у відкритому стані незалежно від атрибута open.
+     Вміст закритого details браузер ховає в псевдоелементі ::details-content,
+     тож самого display: contents на details НЕ досить. Без підтримки
+     ::details-content (Baseline з вересня 2025) кнопка просто лишається. */
+  @supports selector(::details-content) {
+    .site-nav__toggle { display: none; }
+    .site-nav__disclosure { display: contents; }
+    .site-nav__disclosure::details-content {
+      display: contents;
+      content-visibility: visible;
+    }
+  }
 }
 ```
 
@@ -680,7 +690,7 @@ grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
 Є й спеціальні одиниці, відносні до контейнера: `cqw`, `cqh`, `cqi`, `cqb`.
 
 ```css
-.card__title { font-size: clamp(1rem, 5cqi, 1.5rem); }
+.card__title { font-size: clamp(1rem, 0.75rem + 3cqi, 1.5rem); }   /* складник у rem — див. 8.1 */
 ```
 
 🔑 Контейнерні запити вже широко доступні. Це саме той інструмент, який робить
@@ -893,7 +903,8 @@ h2:has(+ p) { margin-block-end: 0.5rem; }
 .article :is(h1, h2, h3, h4) { line-height: 1.2; }
 
 /* Базові стилі, які легко перевизначити (специфічність 0) */
-:where(ul, ol)[class] { list-style: none; padding: 0; }
+:where(ul[class], ol[class]) { list-style: none; padding: 0; }
+/* ⚠️ Не :where(ul, ol)[class] — там [class] поза :where() і дає (0,1,0) */
 ```
 
 ### 11.3. Структурні селектори
@@ -1121,7 +1132,7 @@ CSS тепер підтримує вкладеність без препроце
 | `margin-top` **і** `margin-bottom` | `margin-block` |
 | `width` / `height` | `inline-size` / `block-size` |
 | `text-align: left` | `text-align: start` |
-| `top: 0; right: 0; bottom: 0; left: 0` | `inset: 0` |
+| `top: 0; right: 0; bottom: 0; left: 0` | `inset: 0` (скорочення фізичних; логічні — `inset-block`, `inset-inline`) |
 
 ```css
 .container { margin-inline: auto; padding-inline: 1rem; }
@@ -1344,7 +1355,6 @@ body {
 ```css
 .table-wrapper {
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 .table-wrapper table { min-width: 480px; }
 ```

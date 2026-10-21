@@ -175,7 +175,8 @@ cd client && npm run dev
 // package.json у корені
 {
   "scripts": {
-    "dev": "concurrently -n db,server,client -c blue,green,magenta \"npm:dev:*\"",
+    "dev": "concurrently -c blue,green,magenta \"npm:dev:*\"",
+    "dev:db": "docker compose up db",
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
     "install:all": "npm --prefix server ci && npm --prefix client ci"
@@ -183,6 +184,10 @@ cd client && npm run dev
   "devDependencies": { "concurrently": "^9.1.0" }
 }
 ```
+
+💡 Із шаблоном `npm:dev:*` concurrently сам називає процеси за суфіксом
+(`db`, `server`, `client`); `-n` тут не потрібен — він лише додав би префікс
+до цих назв.
 
 ### 3.3. Проксі замість CORS у розробці
 
@@ -229,7 +234,7 @@ export default defineConfig({
 🔑 **Джерело істини — OpenAPI-специфікація** (лекція 15). Якщо клієнт і сервер
 розходяться, звіряйтеся з нею, а не з чиєюсь пам'яттю.
 
-⚠️ Особливо підступне: PostgreSQL повертає `NUMERIC` як **рядок** (щоб не
+⚠️ Особливо підступне: драйвер `pg` повертає `NUMERIC` як **рядок** (щоб не
 втратити точність). `rating: "8.5"` зламає сортування на клієнті. Приведення в
 мапері обов'язкове:
 
@@ -290,9 +295,9 @@ npm run preview          # перевірити ПРОДАКШЕН-збірку 
 |---|---|---|
 | **Neon** | 0.5 ГБ | serverless, гілки бази як у git, засинає без навантаження |
 | **Supabase** | 500 МБ | PostgreSQL + автогенероване API + автентифікація |
-| **Render PostgreSQL** | 1 ГБ, 90 днів | зручно, якщо сервер теж на Render |
+| **Render PostgreSQL** | 1 ГБ, 30 днів | зручно, якщо сервер теж на Render |
 | **Railway** | пробний кредит | просте налаштування |
-| **Aiven** | пробний період | професійний рівень |
+| **Aiven** | 1 ГБ, без обмеження в часі | професійний рівень |
 
 Після створення отримаєте рядок підключення:
 
@@ -308,6 +313,14 @@ export const pool = new Pool({
   ssl: config.isProduction ? { rejectUnauthorized: false } : false,
 });
 ```
+
+⚠️ Два нюанси. По-перше, `rejectUnauthorized: false` шифрує з'єднання, але
+**не перевіряє сертифікат** (можлива атака «людина посередині») — це
+компроміс, а не норма. По-друге, якщо в `DATABASE_URL` уже є `sslmode=…`,
+драйвер `pg` (v8) бере налаштування з рядка й **ігнорує** об'єкт `ssl`:
+`sslmode=require` там означає повну перевірку сертифіката (як `verify-full`,
+з попередженням `SECURITY WARNING` у консолі). Для Neon із публічним
+сертифікатом найпростіше — `?sslmode=verify-full` у рядку підключення.
 
 **Міграції в продакшені** запускаються автоматично при деплої:
 
@@ -328,8 +341,8 @@ export const pool = new Pool({
 |---|---|---|
 | **Render** | так, засинає після 15 хв | найпростіше для навчального проєкту |
 | **Railway** | пробний кредит | зручний інтерфейс |
-| **Fly.io** | обмежено | контейнери, багато регіонів |
-| **Cyclic / Koyeb** | так | альтернативи |
+| **Fly.io** | ні для нових акаунтів (з жовтня 2024) | контейнери, багато регіонів |
+| **Koyeb** | так | альтернатива (Cyclic закрився у 2024) |
 
 **Налаштування на Render:**
 
@@ -538,8 +551,8 @@ jobs:
     defaults:
       run: { working-directory: server }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm, cache-dependency-path: server/package-lock.json }
       - run: npm ci
       - run: npm run lint
@@ -551,8 +564,8 @@ jobs:
     defaults:
       run: { working-directory: client }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm, cache-dependency-path: client/package-lock.json }
       - run: npm ci
       - run: npm run lint
@@ -593,8 +606,12 @@ DevTools → Lighthouse → Analyze (обов'язково в режимі **Mob
 | Heading elements not in order | виправити ієрархію |
 | `[lang]` missing | `<html lang="uk">` |
 | Image elements no explicit width/height | додати атрибути |
-| Properly size images | адаптивні зображення |
-| Eliminate render-blocking resources | `defer`, критичний CSS |
+| Improve image delivery | адаптивні зображення, WebP/AVIF |
+| Render-blocking requests | `defer`, критичний CSS |
+
+💡 У Lighthouse 13 (жовтень 2025) старі аудити продуктивності на кшталт
+«Properly size images» чи «Eliminate render-blocking resources» замінено
+«інсайтами» з новими назвами — тому в старих посібниках назви інші.
 
 ### 11.3. Ручна перевірка
 
@@ -798,7 +815,7 @@ supertest на сервері. Уміння писати тести відріз
 | 5 | Жорстко зашитий порт | Платформа не може запустити | `process.env.PORT` |
 | 6 | `app.listen(port, 'localhost')` | Недоступно ззовні контейнера | `'0.0.0.0'` |
 | 7 | Немає `trust proxy` | Rate limit блокує всіх | `app.set('trust proxy', 1)` |
-| 8 | Немає SSL для керованої бази | Не підключається | `ssl: { rejectUnauthorized: false }` |
+| 8 | Немає SSL для керованої бази | Не підключається | `sslmode=…` у рядку підключення або `ssl` у `Pool` |
 | 9 | Міграції запущені вручну один раз | Чисте середовище без схеми | У команді `start` |
 | 10 | `NUMERIC` як рядок на клієнті | Ламається сортування | Приведення в мапері |
 | 11 | Не перевірено `npm run preview` | Помилки лише в продакшені | Перевіряти збірку локально |

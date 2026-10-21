@@ -103,7 +103,14 @@ React Router робить це за вас, але розуміти механі
 npm install react-router
 ```
 
-React Router 7 має три режими роботи:
+> ⚠️ Поточна версія — **React Router 8** (вийшла в червні 2026 р.). Вона
+> потребує **Node.js 22.22+** і **React 19.2.7+**, а пакет `react-router-dom`
+> у ній прибрано: усе імпортуємо з `react-router` (лише `RouterProvider` для
+> Data-режиму — з `react-router/dom`). Якщо в старих прикладах трапиться
+> `import … from 'react-router-dom'`, просто замініть шлях імпорту.
+> Декларативний API, який ми розглядаємо нижче, порівняно з v7 не змінився.
+
+React Router має три режими роботи:
 
 | Режим | Опис | Коли |
 |---|---|---|
@@ -150,8 +157,8 @@ export default function App() {
 }
 ```
 
-⚠️ Порядок маршрутів у React Router 7 не має значення — він сам обирає
-найточніший збіг. Але `path="*"` за домовленістю ставлять останнім для
+⚠️ Порядок маршрутів у React Router (починаючи з v6) не має значення — він
+сам обирає найточніший збіг. Але `path="*"` за домовленістю ставлять останнім для
 читабельності.
 
 ---
@@ -180,15 +187,17 @@ import { Link, NavLink } from 'react-router';
 спричинить повне перезавантаження сторінки й втрату всього стану застосунку.
 `<a href>` лишається для зовнішніх посилань.
 
-**Доступність активного пункту:**
+**Доступність активного пункту.** `NavLink` сам додає активному посиланню
+`aria-current="page"` (екранний читач оголосить «поточна сторінка») — вручну
+нічого дописувати не треба. Цей атрибут зручно використати й для стилів:
 
-```jsx
-<NavLink to="/items">
-  {({ isActive }) => (
-    <span aria-current={isActive ? 'page' : undefined}>Список</span>
-  )}
-</NavLink>
+```css
+.nav a[aria-current="page"] { font-weight: 600; }
 ```
+
+💡 `<NavLink to="/items">` активний і на вкладених адресах (`/items/42`,
+`/items/new`). Якщо потрібен лише точний збіг — додайте проп `end`:
+`<NavLink to="/items" end>`. Для `to="/"` точний збіг діє і без нього.
 
 ### 3.2. Програмна навігація
 
@@ -283,7 +292,8 @@ function Layout() {
 ```
 
 `<Outlet />` — місце, куди React Router вставляє дочірній маршрут. Шапка,
-навігація й підвал рендеряться один раз і не перемальовуються при переходах.
+навігація й підвал не перемонтовуються при переходах — їхній стан
+зберігається, змінюється лише вміст `<Outlet />`.
 
 **Прокручування вгору при переході.** React Router не робить цього
 автоматично:
@@ -321,7 +331,7 @@ function ItemsPage() {
   const page = Number(searchParams.get('page') ?? 1);
 
   // Оновлюємо, зберігаючи решту параметрів
-  const updateParams = (updates, { resetPage = true } = {}) => {
+  const updateParams = (updates, { resetPage = true, replace = false } = {}) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
 
@@ -332,12 +342,13 @@ function ItemsPage() {
       if (resetPage) next.delete('page');
 
       return next;
-    }, { replace: true });     // не засмічуємо історію кожним символом
+    }, { replace });
   };
 
   return (
     <>
-      <SearchBar value={search} onChange={q => updateParams({ q })} />
+      {/* replace — лише для пошуку: не засмічуємо історію кожним символом */}
+      <SearchBar value={search} onChange={q => updateParams({ q }, { replace: true })} />
       <CategoryFilter value={categoryId} onChange={c => updateParams({ category: c })} />
       <SortControl
         field={sortField} order={sortOrder}
@@ -346,6 +357,7 @@ function ItemsPage() {
       <ItemList …/>
       <Pagination
         page={page}
+        totalPages={totalPages}
         onChange={p => updateParams({ page: p }, { resetPage: false })}
       />
     </>
@@ -356,7 +368,9 @@ function ItemsPage() {
 🔑 Три деталі:
 
 1. **`replace: true`** для пошуку: інакше кожен введений символ створить запис
-   в історії, і кнопка «Назад» стане непридатною.
+   в історії, і кнопка «Назад» стане непридатною. Зміни категорії, сортування
+   й сторінки, навпаки, додають запис — щоб «Назад» повертав попередній
+   фільтр чи сторінку.
 2. **Порожні значення видаляємо** з URL, а не пишемо `?q=` — адреса лишається
    чистою.
 3. **Скидання сторінки** при зміні фільтрів — те саме правило, що й у
@@ -498,10 +512,18 @@ function NotFoundPage({ message = 'Сторінку не знайдено' }) {
 import { Component } from 'react';
 
 export class ErrorBoundary extends Component {
-  state = { error: null };
+  state = { error: null, resetKey: this.props.resetKey };
 
   static getDerivedStateFromError(error) {
     return { error };
+  }
+
+  // Змінився resetKey (наприклад, адреса) — скидаємо помилку
+  static getDerivedStateFromProps(props, state) {
+    if (props.resetKey !== state.resetKey) {
+      return { error: null, resetKey: props.resetKey };
+    }
+    return null;
   }
 
   componentDidCatch(error, info) {
@@ -525,6 +547,29 @@ export class ErrorBoundary extends Component {
 }
 ```
 
+Межу ставлять у `Layout` навколо `<Outlet />`, щоб шапка й навігація
+лишалися робочими:
+
+```jsx
+const location = useLocation();
+…
+<main id="main" className="layout__main">
+  <ErrorBoundary resetKey={location.pathname}>
+    <Outlet />
+  </ErrorBoundary>
+</main>
+```
+
+⚠️ Без `resetKey` межа, що «впала» на одній сторінці, так і показуватиме
+помилку після переходу на будь-який інший маршрут: компонент `ErrorBoundary`
+не перемонтовується, а його стан зберігається. Варіант
+`<ErrorBoundary key={location.pathname}>` теж скидає помилку, але
+перемонтовує всю сторінку на кожному переході (зокрема між `/items/1` і
+`/items/2`) — локальний стан губиться, а гонки в ефектах маскуються. Тому
+краще `resetKey` + `getDerivedStateFromProps`. Не робіть скидання через
+`componentDidUpdate` + `setState`: це зайвий рендер з «упалим» станом
+(лінтер позначає таке правилом `react/no-did-update-set-state`).
+
 ⚠️ Це **єдине** місце в сучасному React, де класовий компонент обов'язковий:
 хука-аналога поки що немає. Готова альтернатива — бібліотека
 [react-error-boundary](https://github.com/bvaughn/react-error-boundary).
@@ -541,35 +586,48 @@ export class ErrorBoundary extends Component {
 Вимога Завдання №3 — форма має бути **одним переюзаним компонентом**.
 
 ```jsx
+// Для чекбокса значення — checked, а не value (у нього value завжди "on")
+const getFieldValue = ({ type, value, checked }) => (type === 'checkbox' ? checked : value);
+
 function ItemForm({ initialValues, onSubmit, submitLabel = 'Зберегти' }) {
+  const { items } = useData();
+  const schema = buildSchema(items, initialValues?.id);   // див. §11.2
+
   const [values, setValues] = useState(initialValues ?? emptyValues);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Записує або прибирає помилку одного поля
+  const setFieldError = (name, error) =>
+    setErrors(prev => {
+      if (error) return { ...prev, [name]: error };   // порядок ключів не змінюється
+      const { [name]: _, ...rest } = prev;
+      return rest;
+    });
+
   const handleChange = (event) => {
-    const { name, value, type, checked } = event.target;
-    setValues(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    const { name } = event.target;
+    const value = getFieldValue(event.target);
+    setValues(prev => ({ ...prev, [name]: value }));
 
     // Прибираємо помилку одразу, щойно поле стало валідним
-    if (errors[name]) {
-      const fieldError = validateField(name, value, values);
-      if (!fieldError) setErrors(prev => { const { [name]: _, ...rest } = prev; return rest; });
-    }
+    if (errors[name] && !validateField(name, value, schema)) setFieldError(name, null);
   };
 
   const handleBlur = (event) => {
-    const { name, value } = event.target;
-    setTouched(prev => ({ ...prev, [name]: true }));
+    // Фокус перейшов на кнопку відправки — перевірить handleSubmit (див. §12.6)
+    if (event.relatedTarget?.type === 'submit') return;
 
-    const fieldError = validateField(name, value, values);
-    setErrors(prev => fieldError ? { ...prev, [name]: fieldError } : prev);
+    const { name } = event.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
+    setFieldError(name, validateField(name, getFieldValue(event.target), schema));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const allErrors = validateAll(values);
+    const allErrors = validateAll(values, schema);
     setErrors(allErrors);
     setTouched(Object.fromEntries(Object.keys(values).map(k => [k, true])));
 
@@ -602,8 +660,13 @@ function ItemForm({ initialValues, onSubmit, submitLabel = 'Зберегти' })
 <ItemForm onSubmit={handleCreate} submitLabel="Створити" />
 
 // Редагування — той самий компонент
-<ItemForm initialValues={item} onSubmit={handleUpdate} submitLabel="Зберегти зміни" />
+<ItemForm key={item.id} initialValues={item} onSubmit={handleUpdate} submitLabel="Зберегти зміни" />
 ```
+
+💡 `key={item.id}` потрібен тому, що `useState(initialValues)` читає початкові
+значення лише при монтуванні. Під час переходу з `/items/1/edit` на
+`/items/2/edit` компонент не перемонтовується, тож без `key` форма показала
+б дані попереднього запису.
 
 ### 10.2. Переюзане поле
 
@@ -615,10 +678,11 @@ function Field({ label, name, error, touched, hint, children }) {
   const showError = touched && error;
 
   return (
-    <div className={clsx('field', showError && 'field--invalid')}>
+    <div className={`field${showError ? ' field--invalid' : ''}`}>
       <label className="field__label" htmlFor={id}>{label}</label>
 
-      {cloneElement(children, {
+      {/* children — функція: Field передає полю id, name та ARIA-атрибути */}
+      {children({
         id,
         name,
         'aria-invalid': showError ? 'true' : undefined,
@@ -626,7 +690,8 @@ function Field({ label, name, error, touched, hint, children }) {
       })}
 
       {hint && <p className="field__hint" id={hintId}>{hint}</p>}
-      {showError && <p className="field__error" id={errorId} role="alert">{error}</p>}
+      {/* Елемент є завжди: поява тексту не зсуває макет (див. §12.6) */}
+      <p className="field__error" id={errorId} role="alert">{showError ? error : null}</p>
     </div>
   );
 }
@@ -635,9 +700,19 @@ function Field({ label, name, error, touched, hint, children }) {
 ```jsx
 <Field label="Назва" name="title" error={errors.title} touched={touched.title}
        hint="Від 2 до 100 символів">
-  <input type="text" value={values.title} onChange={handleChange} onBlur={handleBlur} />
+  {(fieldProps) => (
+    <input {...fieldProps} type="text" value={values.title}
+           onChange={handleChange} onBlur={handleBlur} />
+  )}
 </Field>
 ```
+
+💡 Часто трапляється варіант із `cloneElement(children, { id, name, … })` —
+він працює, але react.dev відносить `cloneElement` до застарілих (Legacy) API
+і радить натомість render prop, як тут: видно, які саме пропси отримує поле.
+А для класів замість шаблонного рядка можна взяти крихітну бібліотеку
+`clsx` — `clsx('field', showError && 'field--invalid')`, — але її треба
+встановити окремо (`npm install clsx`), у шаблоні Vite її немає.
 
 ---
 
@@ -790,16 +865,49 @@ function focusFirstError(errors) {
 Для довгих форм корисно показати список угорі:
 
 ```jsx
+// 1 помилку, 2–4 помилки, 5+ помилок — правила множини для української
+const plural = new Intl.PluralRules('uk');
+const ERROR_WORD = { one: 'помилку', few: 'помилки', many: 'помилок', other: 'помилки' };
+
 {submitAttempted && Object.keys(errors).length > 0 && (
   <div className="form-errors" role="alert" tabIndex={-1} ref={errorSummaryRef}>
-    <h2>Виправте {Object.keys(errors).length} помил{Object.keys(errors).length === 1 ? 'ку' : 'ки'}:</h2>
+    <h2>Виправте {Object.keys(errors).length} {ERROR_WORD[plural.select(Object.keys(errors).length)]}:</h2>
     <ul>
       {Object.entries(errors).map(([name, message]) => (
-        <li key={name}><a href={`#${name}`}>{message}</a></li>
+        <li key={name}>
+          {/* id полів генерує useId (§10.2), тож шукаємо поле за name */}
+          <a href={`#${name}`}
+             onClick={(e) => { e.preventDefault(); focusFirstError({ [name]: message }); }}>
+            {message}
+          </a>
+        </li>
       ))}
     </ul>
   </div>
 )}
+```
+
+### 12.6. Помилка на `blur` і «зниклий» клік
+
+Підступна пастка валідації на `blur`. Користувач заповнив останнє поле з
+помилкою й натискає мишею «Зберегти»:
+
+1. `mousedown` на кнопці знімає фокус із поля → спрацьовує `blur`;
+2. під полем з'являється повідомлення про помилку → кнопка зсувається вниз;
+3. `mouseup` відбувається вже не над кнопкою → `click` не спрацьовує, форма
+   не надсилається, а користувач не розуміє чому.
+
+Те саме стається з будь-яким елементом нижче поля — наприклад, із чекбоксом.
+
+Перевірка `event.relatedTarget?.type === 'submit'` у `handleBlur` (§10.1)
+закриває випадок із кнопкою відправки, але лише частково: у Safari кнопка
+при кліку не отримує фокуса, і `relatedTarget` буде `null`. Надійніше
+— щоб поява помилки **не зсувала макет**: резервувати під повідомлення місце
+(так зроблено в `Field` з §10.2: елемент рендериться завжди, порожній — коли
+помилки немає) або показувати помилку на місці підказки.
+
+```css
+.field__error { min-height: 1.25rem; }   /* висота одного рядка повідомлення */
 ```
 
 ---
@@ -842,6 +950,7 @@ function ImageField({ value, onChange }) {
 
   const handleUrl = (event) => {
     const url = event.target.value;
+    setError(null);                     // скидаємо помилку попереднього зображення
     setPreview(url);
     onChange(url);
   };
@@ -875,7 +984,9 @@ function ImageField({ value, onChange }) {
 ```
 
 ⚠️ `data:` URL великого зображення легко перевищить квоту `localStorage`
-(~5 МБ). Тому обмеження розміру обов'язкове. У Завданні №5, коли з'явиться
+(~5 МБ): base64 ще й збільшує обсяг приблизно на третину, тож файл на 2 МБ
+займе ~2,7 МБ. Тому обмеження розміру обов'язкове, а для кількох записів
+варто ставити його значно меншим. У Завданні №5, коли з'явиться
 сервер, файли завантажуватимуться туди.
 
 **Заглушка при помилці завантаження:**
@@ -938,11 +1049,23 @@ function ItemFormPage() {
 }
 ```
 
+⚠️ Так перехоплюється лише кнопка «Скасувати». Перехід за посиланням у шапці
+чи кнопкою «Назад» браузера цей код не зупинить: для цього в React Router є
+`useBlocker`, але він працює лише в Data-режимі (`createBrowserRouter`), а з
+`<BrowserRouter>` кидає помилку.
+
 `isDirty` визначається порівнянням поточних значень із початковими:
 
 ```js
-const isDirty = JSON.stringify(values) !== JSON.stringify(initialValues);
+const startValues = initialValues ?? emptyValues;   // у режимі створення initialValues немає
+const isDirty = JSON.stringify(values) !== JSON.stringify(startValues);
 ```
+
+⚠️ Поля `<input>` завжди повертають **рядки**. Якщо в `initialValues` рік чи
+ціна — числа, то після «змінив і повернув як було» форма лишиться брудною
+(`"2010"` ≠ `2010`). Тому перед передачею у форму приводьте такі значення до
+рядків (`{ ...item, year: String(item.year) }`), а назад у число — під час
+збереження.
 
 ---
 
@@ -961,7 +1084,7 @@ const isDirty = JSON.stringify(values) !== JSON.stringify(initialValues);
     onChange={handleChange}
     onBlur={handleBlur}
     aria-invalid={showError ? 'true' : undefined}
-    aria-describedby={showError ? 'title-error' : 'title-hint'}
+    aria-describedby={showError ? 'title-hint title-error' : 'title-hint'}
     autoComplete="off"
   />
   <p id="title-hint" className="field__hint">Від 2 до 100 символів</p>
@@ -1002,7 +1125,10 @@ const isDirty = JSON.stringify(values) !== JSON.stringify(initialValues);
 `<dialog>`:
 
 ```jsx
-function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
+function ConfirmDialog({
+  open, title, message, onConfirm, onCancel,
+  confirmLabel = 'Видалити', cancelLabel = 'Скасувати',
+}) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -1017,8 +1143,8 @@ function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
       <h2 id="dlg-title">{title}</h2>
       <p>{message}</p>
       <div className="dialog__actions">
-        <button type="button" onClick={onCancel}>Скасувати</button>
-        <button type="button" onClick={onConfirm} className="btn--danger">Видалити</button>
+        <button type="button" onClick={onCancel}>{cancelLabel}</button>
+        <button type="button" onClick={onConfirm} className="btn--danger">{confirmLabel}</button>
       </div>
     </dialog>
   );

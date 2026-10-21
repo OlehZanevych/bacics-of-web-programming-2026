@@ -112,7 +112,7 @@ export const createMovieSchema = z.object({
   posterUrl: z.string().url('Некоректне посилання').optional().nullable(),
 
   format: z.enum(['digital', 'disc', 'film'], {
-    errorMap: () => ({ message: 'Формат: digital, disc або film' }),
+    error: 'Формат: digital, disc або film',   // у Zod 4: error, а не errorMap
   }).default('digital'),
 
   isPublished: z.boolean().default(false),
@@ -124,6 +124,12 @@ export const createMovieSchema = z.object({
 
 // Оновлення: усі поля необов'язкові, але хоча б одне має бути
 export const updateMovieSchema = createMovieSchema
+  .extend({
+    // У Zod 4 .default() спрацьовує й усередині .partial(): без цього кожне
+    // оновлення скидало б format та isPublished до значень за замовчуванням
+    format: z.enum(['digital', 'disc', 'film']).optional(),
+    isPublished: z.boolean().optional(),
+  })
   .partial()
   .refine(data => Object.keys(data).length > 0, {
     message: 'Потрібно передати хоча б одне поле для оновлення',
@@ -515,7 +521,7 @@ describe('moviesService', () => {
 ```bash
 node --test
 node --test --watch
-node --test tests/unit/
+node --test "tests/unit/**/*.test.js"    # шаблон (glob), а не просто тека
 ```
 
 **Валідатори тестуються ще простіше:**
@@ -648,7 +654,7 @@ describe('API /api/v1/movies', () => {
         .set('Authorization', `Bearer ${token}`).send(payload).expect(409);
     });
 
-    test('ігнорує спробу передати заборонене поле', async () => {
+    test('відхиляє спробу передати заборонене поле', async () => {
       await request(app)
         .post('/api/v1/movies')
         .set('Authorization', `Bearer ${token}`)
@@ -662,14 +668,14 @@ describe('API /api/v1/movies', () => {
       const userToken = createTestToken({ id: 2, role: 'USER' });
 
       await request(app)
-        .delete('/api/v1/movies/00000000-0000-0000-0000-000000000001')
+        .delete('/api/v1/movies/00000000-0000-4000-8000-000000000001')
         .set('Authorization', `Bearer ${userToken}`)
         .expect(403);
     });
 
     test('повертає 404 для неіснуючого id', async () => {
       await request(app)
-        .delete('/api/v1/movies/00000000-0000-0000-0000-0000000000ff')
+        .delete('/api/v1/movies/00000000-0000-4000-8000-0000000000ff')
         .set('Authorization', `Bearer ${token}`)
         .expect(404);
     });
@@ -701,10 +707,12 @@ export async function seedTestData() {
     `INSERT INTO genres (name, slug) VALUES ('Драма', 'drama') RETURNING id`
   );
 
+  // Фіксовані id мають бути коректними UUID за RFC 9562 (версія …-4…, варіант …-8…):
+  // z.string().uuid() у Zod 4 відхиляє «00000000-0000-0000-0000-000000000001»
   await pool.query(
     `INSERT INTO movies (id, title, year, genre_id) VALUES
-       ('00000000-0000-0000-0000-000000000001', 'Земля', 1930, $1),
-       ('00000000-0000-0000-0000-000000000002', 'Тіні забутих предків', 1965, $1)`,
+       ('00000000-0000-4000-8000-000000000001', 'Земля', 1930, $1),
+       ('00000000-0000-4000-8000-000000000002', 'Тіні забутих предків', 1965, $1)`,
     [genre.id]
   );
 }
@@ -736,16 +744,22 @@ JWT_SECRET=test-secret-not-for-production-use-only
     ports:
       - "5433:5432"                    # інший порт!
     tmpfs:
-      - /var/lib/postgresql/data       # у пам'яті — швидше, дані не зберігаються
+      - /var/lib/postgresql            # у пам'яті — швидше, дані не зберігаються
+                                       # (для образів 18+; для ≤17 було …/postgresql/data)
 ```
 
 ```json
 "scripts": {
-  "test": "node --env-file=.env.test --test tests/",
-  "test:watch": "node --env-file=.env.test --test --watch tests/",
-  "test:coverage": "node --env-file=.env.test --test --experimental-test-coverage tests/"
+  "test": "node --env-file=.env.test --test --test-concurrency=1 \"tests/**/*.test.js\"",
+  "test:watch": "node --env-file=.env.test --test --test-concurrency=1 --watch \"tests/**/*.test.js\"",
+  "test:coverage": "node --env-file=.env.test --test --test-concurrency=1 --experimental-test-coverage \"tests/**/*.test.js\""
 }
 ```
+
+⚠️ `node --test tests/` не працює: аргументи — це шаблони файлів, а не теки
+(`Cannot find module '…/tests'`). А `--test-concurrency=1` потрібен, бо
+за замовчуванням файли тестів виконуються **паралельно** в окремих процесах —
+і кілька файлів, що роблять `TRUNCATE` в одній базі, заважатимуть один одному.
 
 **Три правила тестів із базою:**
 
@@ -793,10 +807,15 @@ node --test --experimental-test-coverage
 браузері, автоматична перевірка контракту.
 
 ```bash
-npm install swagger-ui-express
+npm install swagger-ui-express yaml
 ```
 
 ### 12.1. Опис
+
+💡 OpenAPI 3.1 повністю сумісний із JSON Schema 2020-12, тому замість
+`nullable: true` (це ключ версії 3.0) пишемо `type: [string, 'null']`.
+Найновіша версія специфікації — 3.2.0 (вересень 2025), зворотно сумісна з
+3.1; для навчального проєкту 3.1 цілком достатньо.
 
 ```yaml
 # docs/openapi.yaml
@@ -837,11 +856,10 @@ components:
         id: { type: string, format: uuid }
         title: { type: string, example: "Тіні забутих предків" }
         year: { type: integer, minimum: 1888, maximum: 2100, example: 1965 }
-        rating: { type: number, nullable: true, minimum: 0, maximum: 10 }
-        description: { type: string, nullable: true }
+        rating: { type: [number, 'null'], minimum: 0, maximum: 10 }   # у 3.1 немає nullable
+        description: { type: [string, 'null'] }
         genre:
-          type: object
-          nullable: true
+          type: [object, 'null']
           properties:
             id: { type: integer }
             name: { type: string }
@@ -853,7 +871,7 @@ components:
       properties:
         title: { type: string, minLength: 2, maxLength: 200 }
         year: { type: integer, minimum: 1888, maximum: 2100 }
-        genreId: { type: integer, nullable: true }
+        genreId: { type: [integer, 'null'] }
 
     Error:
       type: object
@@ -1124,8 +1142,8 @@ jobs:
       JWT_SECRET: ci-test-secret-value-not-for-production
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7       # v4 працювали на Node 20, який прибрано з раннерів
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm

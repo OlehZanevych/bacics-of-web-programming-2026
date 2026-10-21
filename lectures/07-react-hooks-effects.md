@@ -92,9 +92,11 @@ useState(0)       // → слот 0 ⚠️ отримає значення name!
 
 Порядок збився — стан «переїхав». Саме тому умовні виклики заборонені.
 
-🔑 Правило контролює плагін **`eslint-plugin-react-hooks`**. Він увімкнений у
-шаблоні Vite і має бути увімкнений у Завданні №3. Не ігноруйте його
-попередження.
+🔑 Правила хуків контролює лінтер. У шаблоні Vite (`create-vite` 9) це
+**Oxlint** із плагіном `react` (правила `rules-of-hooks`, `exhaustive-deps`,
+`set-state-in-effect` тощо); у проєктах на ESLint — плагін
+**`eslint-plugin-react-hooks`** з тими самими правилами. Лінтер має бути
+увімкнений у Завданні №3. Не ігноруйте його попередження.
 
 ---
 
@@ -122,8 +124,11 @@ function Title({ text }) {
 рендер → React оновлює DOM → браузер малює → ВИКОНУЄТЬСЯ ЕФЕКТ
 ```
 
-Ефект завжди виконується **після** того, як браузер відмалював кадр. Тому він
-не блокує показ інтерфейсу.
+Ефект виконується **після** того, як React оновив DOM, і зазвичай — уже після
+того, як браузер відмалював кадр. Тому він не блокує показ інтерфейсу.
+(Виняток: якщо оновлення спричинила дискретна дія на кшталт кліку, React може
+виконати ефект ще до малювання; коли щось треба виміряти й змінити саме до
+малювання, існує `useLayoutEffect`.)
 
 ### 2.2. Три форми
 
@@ -137,6 +142,10 @@ useEffect(() => { … }, []);
 // 3. Після монтування і при зміні залежностей
 useEffect(() => { … }, [userId, filter]);
 ```
+
+⚠️ «Один раз» — це про production. У режимі розробки з `<StrictMode>` React
+навмисно виконує ефект двічі: запуск → очищення → запуск (див. §4.2). Код
+ефекту має бути до цього готовий.
 
 ---
 
@@ -171,7 +180,8 @@ React порівнює залежності через `Object.is` — тобт�
 об'єктів і функцій.
 
 ```jsx
-// ❌ Новий об'єкт на кожному рендері → ефект спрацьовує нескінченно
+// ❌ Новий об'єкт на кожному рендері → ефект спрацьовує після КОЖНОГО рендеру
+//    (а якщо load змінює стан — нескінченно)
 function Bad({ id }) {
   const options = { id, limit: 10 };
   useEffect(() => { load(options); }, [options]);
@@ -207,7 +217,7 @@ useEffect(() => {
 // ❌ При зміні userId дані не перезавантажаться
 useEffect(() => {
   fetchUser(userId).then(setUser);
-}, []);              // ESLint попередить
+}, []);              // лінтер попередить (exhaustive-deps)
 ```
 
 ⚠️ **Ніколи не «затикайте» ESLint коментарем `// eslint-disable-next-line`,
@@ -270,14 +280,16 @@ useEffect(() => {
 Відповідь для `1` може прийти **після** відповіді для `2` і перезаписати її.
 
 ```jsx
+// Результат зберігаємо разом з id, для якого його отримано
+const [result, setResult] = useState({ id: null, status: 'loading', data: null, error: null });
+
 // ✅ Прапорець-«ігнорування»
 useEffect(() => {
   let ignore = false;
 
-  setStatus('loading');
   fetchMovie(id)
-    .then(data => { if (!ignore) { setMovie(data); setStatus('success'); } })
-    .catch(err => { if (!ignore) { setError(err); setStatus('error'); } });
+    .then(data => { if (!ignore) setResult({ id, status: 'success', data, error: null }); })
+    .catch(error => { if (!ignore) setResult({ id, status: 'error', data: null, error }); });
 
   return () => { ignore = true; };
 }, [id]);
@@ -287,12 +299,25 @@ useEffect(() => {
   const controller = new AbortController();
 
   loadMovie(id, { signal: controller.signal })
-    .then(setMovie)
-    .catch(err => { if (err.name !== 'AbortError') setError(err); });
+    .then(data => setResult({ id, status: 'success', data, error: null }))
+    .catch(error => {
+      if (error.name !== 'AbortError') setResult({ id, status: 'error', data: null, error });
+    });
 
   return () => controller.abort();
 }, [id]);
+
+// «Завантаження» не зберігаємо, а обчислюємо під час рендеру:
+// відповіді для поточного id ще немає
+const status = result.id === id ? result.status : 'loading';
 ```
+
+⚠️ Не починайте ефект із `setStatus('loading')` чи `setError(null)`.
+Синхронний `setState` у тілі ефекту — це зайвий каскадний рендер, і лінтер
+попередить (`set-state-in-effect`: «Calling setState synchronously within an
+effect can trigger cascading renders»). `setState` у `.then`/`.catch` —
+нормально: це реакція на відповідь зовнішньої системи. Інший спосіб скинути
+стан при зміні `id` — `key` (§5.3).
 
 🔑 У `<StrictMode>` React навмисно монтує компонент, знімає й монтує знову —
 саме щоб виявити ефекти без очищення. Якщо ваш ефект після цього поводиться
@@ -606,38 +631,40 @@ export function useLocalStorage(key, initialValue) {
     }
   }, [key, value]);
 
-  const remove = useCallback(() => {
-    localStorage.removeItem(key);
-    setValue(initialValue);
-  }, [key, initialValue]);
+  // Скидає до initialValue. Ключ НЕ зникає зі сховища: ефект вище
+  // одразу запише initialValue назад (тому removeItem тут був би марним).
+  const reset = useCallback(() => setValue(initialValue), [initialValue]);
 
-  return [value, setValue, remove];
+  return [value, setValue, reset];
 }
 ```
+
+⚠️ Хук розрахований на **незмінний** `key`. Якщо `key` зміниться (наприклад,
+`` `draft-${movieId}` ``), стан лишиться від старого ключа, і ефект запише його
+під новим, затерши збережене там значення. Для динамічного ключа передайте його
+ще й як `key` компоненту, що викликає хук (§5.3).
 
 ### 8.3. `useToggle` і `useMediaQuery`
 
 ```jsx
+import { useCallback, useState, useSyncExternalStore } from 'react';
+
 export function useToggle(initial = false) {
   const [value, setValue] = useState(initial);
   const toggle = useCallback(() => setValue(v => !v), []);
   return [value, toggle, setValue];
 }
 
+// matchMedia — зовнішнє джерело, тож замість useState + useEffect
+// беремо useSyncExternalStore (§10): без синхронного setState в ефекті
 export function useMediaQuery(query) {
-  const [matches, setMatches] = useState(
-    () => window.matchMedia(query).matches
-  );
-
-  useEffect(() => {
+  const subscribe = useCallback((onChange) => {
     const mql = window.matchMedia(query);
-    const onChange = (e) => setMatches(e.matches);
     mql.addEventListener('change', onChange);
-    setMatches(mql.matches);
     return () => mql.removeEventListener('change', onChange);
   }, [query]);
 
-  return matches;
+  return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches);
 }
 ```
 
@@ -703,18 +730,20 @@ const deferredQuery = useDeferredValue(query);
 ```
 
 ```jsx
-// Підписка на зовнішнє джерело (наприклад, статус мережі)
-const isOnline = useSyncExternalStore(
-  (callback) => {
-    window.addEventListener('online', callback);
-    window.addEventListener('offline', callback);
-    return () => {
-      window.removeEventListener('online', callback);
-      window.removeEventListener('offline', callback);
-    };
-  },
-  () => navigator.onLine
-);
+// Підписка на зовнішнє джерело (наприклад, статус мережі).
+// subscribe оголошено поза компонентом: нова функція на кожному рендері
+// змушувала б React щоразу перепідписуватися
+function subscribeOnline(callback) {
+  window.addEventListener('online', callback);
+  window.addEventListener('offline', callback);
+  return () => {
+    window.removeEventListener('online', callback);
+    window.removeEventListener('offline', callback);
+  };
+}
+
+// У компоненті
+const isOnline = useSyncExternalStore(subscribeOnline, () => navigator.onLine);
 ```
 
 Ще два хуки — `useContext` і `useReducer` — розберемо в лекції 8, бо вони
@@ -758,13 +787,15 @@ function useWhyDidYouUpdate(name, props) {
 
 ### 11.3. Типовий сценарій «нескінченний цикл»
 
-Симптом: браузер підвисає, у консолі «Too many re-renders».
+Симптом: браузер підвисає, у консолі «Too many re-renders» (цикл під час
+рендеру) або «Maximum update depth exceeded» (цикл через ефект).
 
 Перевірте по черзі:
 
-1. Чи не викликається `setState` **під час рендеру** (а не в обробнику чи
-   ефекті)?
-2. Чи не змінює ефект стан, від якого сам залежить?
+1. Чи не викликається `setState` **під час рендеру** (а не в обробнику
+   події)?
+2. Чи не змінює ефект стан, від якого сам залежить? (Синхронний `setState` у
+   тілі ефекту лінтер позначає правилом `set-state-in-effect`.)
 3. Чи не створюється новий об'єкт/масив/функція прямо в залежностях?
 4. Чи не написано `onClick={handleClick()}` замість `onClick={handleClick}`?
 
@@ -786,9 +817,9 @@ function useWhyDidYouUpdate(name, props) {
 | 10 | Читання `ref.current` під час рендеру | Непередбачувано | Читати в ефектах і обробниках |
 | 11 | Передчасна мемоізація всього | Складний код без користі | Спочатку профайлер |
 | 12 | `memo` без `useCallback` у props | Оптимізація не працює | Мемоізувати й функції |
-| 13 | `setState` під час рендеру | «Too many re-renders» | В обробнику або ефекті |
+| 13 | `setState` під час рендеру | «Too many re-renders» | В обробнику події; похідне — обчислювати |
 | 14 | Ефект як реакція на клік | Зайва складність | Логіка в обробнику |
-| 15 | Власний хук без префікса `use` | ESLint не перевіряє правила | Іменувати `useЩось` |
+| 15 | Власний хук без префікса `use` | Лінтер не перевіряє правила | Іменувати `useЩось` |
 
 ---
 
@@ -828,7 +859,7 @@ function useWhyDidYouUpdate(name, props) {
 **Вправа 3 (завантаження, 40 хв).** Компонент, що завантажує список постів із
 JSONPlaceholder. Реалізуйте всі чотири стани (завантаження, помилка, порожньо,
 дані) і захист від гонок при швидкій зміні `userId`. Перевірте в Network із
-затримкою Slow 3G.
+затримкою «3G» (у старих версіях Chrome — «Slow 3G»).
 
 **Вправа 4 (прибирання ефектів, 30 хв).** Знайдіть і приберіть **усі** зайві
 ефекти:

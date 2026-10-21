@@ -10,9 +10,9 @@
 ## Про що ця лекція
 
 Досі весь наш JavaScript виконувався у браузері. Тепер він переїжджає на
-**сервер**. Node.js — це те саме середовище виконання, що й у Chrome (двигун
-V8), але з іншим набором можливостей: замість DOM і `fetch` — файлова система,
-мережеві сокети, процеси.
+**сервер**. Node.js використовує той самий двигун, що й Chrome (V8), але має
+інший набір можливостей: замість DOM — файлова система, мережеві сокети,
+процеси (а `fetch` є і там, і там).
 
 Це перша з п'яти лекцій про серверну частину. Тут ми розберемо **саме
 середовище**: як воно влаштоване, чому однопотокове, як працюють модулі й
@@ -81,12 +81,15 @@ npm, і напишемо HTTP-сервер без жодного фреймво�
 ### 1.2. Версії
 
 Node.js має чіткий графік випусків: парні мажорні версії стають LTS
-(Long Term Support) і підтримуються ~30 місяців.
+(Long Term Support) і підтримуються ~30 місяців. Починаючи з Node.js 27
+графік змінюється: один мажорний випуск на рік, і LTS стає кожен.
 
-Станом на 2026 рік: **Node.js 24 (Krypton)** і **22 (Jod)** — Active LTS,
-20 — Maintenance, 26 — Current.
+Станом на жовтень 2026 р.: **Node.js 24 (Krypton)** і **22 (Jod)** —
+Maintenance LTS (24 перейшла в цю фазу 20.10.2026, підтримується до квітня
+2028), **26** — Current і 28.10.2026 стає Active LTS; 20 — EOL з 30.04.2026.
 
-🔑 **Для навчальних і бойових проєктів беріть Active LTS** (зараз — 24).
+🔑 **Для навчальних і бойових проєктів беріть LTS** (у курсі — 24; з кінця
+жовтня 2026 Active LTS — 26).
 Версію проєкту фіксують у `package.json`:
 
 ```json
@@ -129,7 +132,7 @@ Node.js — **однопотоковий** для вашого коду. Оди�
 │  └─────────────┬─────────────┘
 └────────────────┘
 
-Між КОЖНИМИ фазами виконуються всі мікрозадачі:
+Після КОЖНОГО колбека (і між фазами) виконуються всі мікрозадачі:
 process.nextTick() → черга промісів
 ```
 
@@ -151,8 +154,14 @@ console.log('6: синхронно');
 запусками (на верхньому рівні модуля таймери й `setImmediate` не мають
 гарантованого порядку; усередині циклу I/O `setImmediate` завжди раніший).
 
-🔑 `process.nextTick` має **вищий пріоритет за проміси**. Зловживати ним не
-варто: нескінченна черга `nextTick` заблокує цикл подій повністю.
+⚠️ Так буде для CommonJS (`.cjs`). В ES-модулі (наш `"type": "module"`) на
+Node.js 22/24 вийде `1, 6, 4, 5`: модуль виконується всередині вже запущеної
+черги мікрозадач, тож проміс устигає раніше за `nextTick`. (На Node.js 26
+модуль без `await` на верхньому рівні знову дає `1, 6, 5, 4`.)
+
+🔑 `process.nextTick` має **вищий пріоритет за проміси**, коли обидві черги
+чекають після завершення колбека. Зловживати ним не варто: нескінченна черга
+`nextTick` заблокує цикл подій повністю.
 
 ### 2.3. Пул потоків
 
@@ -319,8 +328,8 @@ if (process.env.NODE_ENV === 'development') {
 
 ```bash
 npm init -y
-npm install express pg dotenv
-npm install --save-dev nodemon eslint prettier
+npm install express pg zod
+npm install --save-dev eslint @eslint/js globals prettier
 ```
 
 ### 5.2. Анатомія `package.json`
@@ -345,10 +354,12 @@ npm install --save-dev nodemon eslint prettier
   "dependencies": {
     "express": "^5.2.1",
     "pg": "^8.13.0",
-    "zod": "^3.24.0"
+    "zod": "^4.1.0"
   },
   "devDependencies": {
-    "eslint": "^9.17.0",
+    "@eslint/js": "^10.0.0",
+    "eslint": "^10.0.0",
+    "globals": "^17.0.0",
     "prettier": "^3.4.0"
   }
 }
@@ -475,6 +486,7 @@ crypto.randomBytes(32).toString('hex');        // секретний ключ
 crypto.createHash('sha256').update(text).digest('hex');
 
 // Порівняння секретів БЕЗ витоку через час виконання
+// (буфери мають бути однакової довжини, інакше — виняток; перевірте довжину заздалегідь)
 crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 ```
 
@@ -602,7 +614,7 @@ const readBody = (req) => new Promise((resolve, reject) => {
     const raw = Buffer.concat(chunks).toString('utf8');
     if (!raw) return resolve(null);
     try { resolve(JSON.parse(raw)); }
-    catch { reject(new Error('Invalid JSON')); }
+    catch { reject(Object.assign(new Error('Invalid JSON'), { status: 400 })); }
   });
 
   req.on('error', reject);
@@ -634,7 +646,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && pathname === '/api/movies') {
       const body = await readBody(req);
 
-      if (!body?.title?.trim()) {
+      if (typeof body?.title !== 'string' || !body.title.trim()) {
         return json(res, 400, { message: 'Поле title обов\'язкове' });
       }
       if (movies.some(m => m.title.toLowerCase() === body.title.toLowerCase())) {
@@ -659,6 +671,7 @@ const server = http.createServer(async (req, res) => {
 
     return json(res, 404, { message: 'Маршрут не знайдено' });
   } catch (error) {
+    if (error.status === 400) return json(res, 400, { message: 'Некоректний JSON' });
     console.error(error);
     return json(res, 500, { message: 'Внутрішня помилка сервера' });
   }
@@ -876,7 +889,7 @@ node --test --experimental-test-coverage
 ### 11.4. ESLint і Prettier
 
 ```bash
-npm install -D eslint @eslint/js prettier
+npm install -D eslint @eslint/js globals prettier
 npx eslint --init
 ```
 
@@ -920,7 +933,7 @@ export default [
 | 9 | Склеювання шляхів через `+ '/'` | Ламається на Windows | `path.join` |
 | 10 | Немає перевірки path traversal | Читання довільних файлів | Перевірка префікса |
 | 11 | Немає обмеження розміру тіла запиту | Вичерпання пам'яті | Ліміт у 1 МБ |
-| 12 | Немає обробки `unhandledRejection` | Тихі збої | Обробники + вихід |
+| 12 | Немає обробки `unhandledRejection` | Процес падає (Node.js 15+) без запису у ваш журнал | Обробники + вихід |
 | 13 | Немає коректного завершення | Втрачені запити при деплої | `SIGTERM` + `server.close` |
 | 14 | Багато дрібних залежностей | Ризики безпеки, довгий `npm ci` | Мінімум залежностей |
 | 15 | `"*"` як версія залежності | Раптові поломки | `^` або точна версія |
@@ -956,8 +969,9 @@ export default [
 Node, кількість ядер і вільну пам'ять.
 
 **Вправа 2 (цикл подій, 20 хв).** Напишіть код, що демонструє порядок:
-синхронний → `process.nextTick` → проміс → `setTimeout` → `setImmediate`.
-Поясніть результат.
+синхронний → `process.nextTick` → проміс → `setTimeout` / `setImmediate`.
+Запустіть його як `.cjs` і як `.mjs` та поясніть результат (зокрема, чому
+порядок `setTimeout` і `setImmediate` на верхньому рівні не гарантований).
 
 **Вправа 3 (блокування, 25 хв).** Зробіть сервер із двома маршрутами:
 `/fast` (відповідає одразу) і `/slow` (синхронний цикл на 5 секунд).
@@ -1013,7 +1027,7 @@ Node, кількість ядер і вільну пам'ять.
 1. **Buna, S.** *Efficient Node.js.* — O'Reilly, 2025. — Найсвіжіша книга про
    продуктивність і надійність Node.js: цикл подій, потоки, профілювання,
    масштабування. Прямо до цієї лекції.
-2. **Cantelon, M., Harter, M., Holowaychuk, T., Rajlich, N.** *Node.js in
+2. **Young, A., Meck, B., Cantelon, M., et al.** *Node.js in
    Action.* 2nd ed. — Manning, 2017. — Класичний вступ; частина API
    застаріла, концепції — ні.
 3. **Brown, E.** *Web Development with Node and Express.* 2nd ed. —

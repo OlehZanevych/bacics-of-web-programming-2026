@@ -211,7 +211,7 @@ export function useAsync(asyncFn, deps = []) {
 
 ```jsx
 function MoviesPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get('page') ?? 1);
   const search = searchParams.get('q') ?? '';
   const debouncedSearch = useDebounce(search, 300);
@@ -221,8 +221,9 @@ function MoviesPage() {
     [page, debouncedSearch]
   );
 
-  if (status === 'loading') return <MovieListSkeleton count={12} />;
-  if (status === 'error')   return <ErrorState error={error} onRetry={reload} />;
+  // 'idle' — перший рендер до запуску ефекту: це теж «ще вантажимо», а не «порожньо»
+  if (status === 'idle' || status === 'loading') return <MovieListSkeleton count={12} />;
+  if (status === 'error') return <ErrorState message={describeError(error)} onRetry={reload} />;
   if (!data?.data?.length)  return <EmptyState onReset={() => setSearchParams({})} />;
 
   return (
@@ -250,8 +251,10 @@ function MoviesPage() {
 Розв'язання: `debounce` + `AbortController`.
 
 **2. Перехід на іншу сторінку до завершення запиту.** Компонент знято, а
-`setState` викликається → попередження й потенційний витік. Розв'язання:
-скасування в функції очищення ефекту.
+запит досі летить і його результат уже нікому не потрібен (з React 18
+попередження про `setState` у знятому компоненті прибрали, тож помилки в
+консолі не буде — лише зайвий трафік і робота). Розв'язання: скасування в
+функції очищення ефекту.
 
 **3. Подвійне надсилання форми.** Користувач двічі натиснув «Зберегти» →
 два однакові записи. Розв'язання: блокування кнопки під час відправки.
@@ -278,15 +281,19 @@ const handleSubmit = async (values) => {
 ## 4. Стани інтерфейсу
 
 ```jsx
-function ErrorState({ error, onRetry }) {
-  const message =
-    error instanceof HttpError
-      ? error.isNotFound     ? 'Записи не знайдено'
-      : error.isUnauthorized ? 'Потрібно увійти'
-      : error.isServerError  ? 'Сервер тимчасово недоступний. Спробуйте пізніше.'
-      : error.message
-      : 'Не вдалося з\'єднатися з сервером. Перевірте інтернет.';
+// src/api/http.js (продовження) — текст помилки для користувача
+export function describeError(error) {
+  return error instanceof HttpError
+    ? error.isNotFound     ? 'Записи не знайдено'
+    : error.isUnauthorized ? 'Потрібно увійти'
+    : error.isServerError  ? 'Сервер тимчасово недоступний. Спробуйте пізніше.'
+    : error.message
+    : 'Не вдалося з\'єднатися з сервером. Перевірте інтернет.';
+}
 
+// components/states/ErrorState.jsx — лише показує готовий текст,
+// про HttpError і api/ не знає (див. правила залежностей у розділі 9)
+function ErrorState({ message, onRetry }) {
   return (
     <div className="state state--error" role="alert">
       <h2>Щось пішло не так</h2>
@@ -431,6 +438,12 @@ const [optimisticMovies, addOptimistic] = useOptimistic(
   }
 );
 ```
+
+⚠️ `addOptimistic` викликають лише всередині Action (наприклад, `action`
+форми) або `startTransition(async () => { … })`. Поза ними React виведе
+попередження, а оптимістичний стан одразу повернеться до `movies`. Коли дія
+завершиться, `optimisticMovies` знову дорівнюватиме `movies`, тож справжній
+стан (`setMovies`) теж треба оновити.
 
 ⚠️ Оптимістичне оновлення доречне для дій, що **майже завжди** успішні
 (лайк, видалення, позначка «прочитано»). Для оплати чи створення складного
@@ -667,16 +680,16 @@ SPA створює специфічні проблеми доступності,
 ```jsx
 function RouteAnnouncer() {
   const { pathname } = useLocation();
-  const [message, setMessage] = useState('');
+  const regionRef = useRef(null);
 
   useEffect(() => {
-    setMessage(`Перейшли на сторінку ${document.title}`);
+    // Пишемо в DOM напряму, без setState: синхронний setState в ефекті —
+    // зайвий повторний рендер (Oxlint: react/set-state-in-effect)
+    regionRef.current.textContent = `Перейшли на сторінку ${document.title}`;
   }, [pathname]);
 
   return (
-    <div role="status" aria-live="polite" className="visually-hidden">
-      {message}
-    </div>
+    <div ref={regionRef} role="status" aria-live="polite" className="visually-hidden" />
   );
 }
 ```
@@ -696,6 +709,10 @@ useEffect(() => {
 ```jsx
 useEffect(() => { document.title = `${movie.title} — Кінокаталог`; }, [movie.title]);
 ```
+
+💡 У React 19 можна й без ефекту: ``<title>{`${movie.title} — Кінокаталог`}</title>``
+прямо в JSX сторінки — React сам перенесе його в `<head>` (вміст має бути одним
+рядком, тому шаблонний літерал).
 
 **4. Динамічні повідомлення** (сповіщення, результати пошуку):
 
@@ -775,7 +792,7 @@ npx vite-bundle-visualizer
 знадобляться на боці сервера.
 
 ```bash
-npm install -D vitest @testing-library/react @testing-library/user-event jsdom
+npm install -D vitest @testing-library/react @testing-library/dom @testing-library/jest-dom @testing-library/user-event jsdom
 ```
 
 ```js
@@ -784,6 +801,11 @@ export default defineConfig({
   plugins: [react()],
   test: { environment: 'jsdom', globals: true, setupFiles: './src/setupTests.js' },
 });
+```
+
+```js
+// src/setupTests.js — матчери на кшталт toBeInTheDocument()
+import '@testing-library/jest-dom/vitest';
 ```
 
 ```jsx
@@ -877,8 +899,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -896,7 +918,7 @@ jobs:
 | 1 | `fetch` напряму в компонентах | Дублювання, неможливо змінити базовий URL | Шар `api/` |
 | 2 | Адреса API «зашита» в код | Не працює в продакшені | `import.meta.env.VITE_API_URL` |
 | 3 | Немає перевірки `response.ok` | 404 сприймається як успіх | Обгортка з `HttpError` |
-| 4 | Немає скасування запитів | Гонки, попередження після знімання | `AbortController` |
+| 4 | Немає скасування запитів | Гонки, застарілі відповіді, зайві запити | `AbortController` |
 | 5 | `AbortError` показується користувачеві | «Помилка» на кожен символ | Ігнорувати |
 | 6 | Три стани замість чотирьох | «Порожньо» виглядає як поломка | Додати `EmptyState` |
 | 7 | Спінер для швидких запитів | Блимання | Затримка або збереження старих даних |
@@ -905,7 +927,7 @@ jobs:
 | 10 | Оптимістичне оновлення без відкоту | Розсинхронізація з сервером | Зберігати знімок |
 | 11 | Зміна маршруту не оголошується | Недоступно для екранних читачів | `aria-live` + фокус |
 | 12 | `document.title` не змінюється | Погана навігація й SEO | Оновлювати в ефекті |
-| 13 | Токен у коді або в git | Витік | Змінні середовища, `.gitignore` |
+| 13 | Токен у коді або в git | Витік | Секрети — лише на сервері (`VITE_*` бачить кожен), `.env` у `.gitignore` |
 | 14 | Оптимізація без профілювання | Складний код без користі | Спочатку Profiler |
 | 15 | Немає SPA-fallback | 404 при прямому URL | Налаштувати хостинг |
 | 16 | `components/` імпортує з `api/` | Порушення шарів | Дані через props |
@@ -941,8 +963,8 @@ jobs:
 
 **Вправа 2 (хук завантаження, 40 хв).** Напишіть `useAsync` самостійно.
 Перевірте: швидка зміна параметрів (у Network зайві запити мають бути
-`canceled`); перехід на іншу сторінку під час завантаження (не має бути
-попереджень у консолі).
+`canceled`); перехід на іншу сторінку під час завантаження (незавершений
+запит теж має стати `canceled`, у консолі — жодних помилок).
 
 **Вправа 3 (стани, 35 хв).** Реалізуйте `ErrorState`, `EmptyState` і скелетон.
 Перевірте всі чотири стани, зокрема через Network → Offline і Slow 3G.
