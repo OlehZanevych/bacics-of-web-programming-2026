@@ -2,7 +2,7 @@
 
 > **Курс:** Основи web програмування · ЛНУ ім. Івана Франка · ФПМІ
 > **Заняття:** 13 жовтня 2026 р.
-> **Теорія:** [Лекція 6. React: компонентна модель, props, state](../../bacics-of-web-programming-2026/lectures/06-react-components-props-state.md)
+> **Теорія:** [Лекція 6. React: компонентна модель, props, state](../../lectures/06-react-components-props-state.md)
 > **Інструменти:** WebStorm 2026.2, Node.js 24 LTS, Vite 8, React 19
 > **Тривалість:** близько 2 академічних годин
 
@@ -164,7 +164,7 @@ Firefox і Edge). Воно додає в інструменти розробни
 2. У лівій панелі оберіть **Vite**.
 3. У правій панелі:
    - **Location** — шлях до нової папки, наприклад
-     `…/Lessons/2026-10-14/movie-watchlist`. Остання частина шляху стане назвою
+     `…/lessons/10.14/movie-watchlist`. Остання частина шляху стане назвою
      проєкту.
    - **Node runtime** — версія Node.js із кроку 1.1.
    - **Vite** — `npx create-vite`.
@@ -1738,5 +1738,5 @@ movie-watchlist/
 - [WebStorm — Vite](https://www.jetbrains.com/help/webstorm/vite.html) —
   створення й запуск проєкту в IDE.
 - [React Developer Tools](https://react.dev/learn/react-developer-tools).
-- [Лекція 6 курсу](../../bacics-of-web-programming-2026/lectures/06-react-components-props-state.md) —
+- [Лекція 6 курсу](../../lectures/06-react-components-props-state.md) —
   усі посилання на розділи (§) в інструкції ведуть туди.

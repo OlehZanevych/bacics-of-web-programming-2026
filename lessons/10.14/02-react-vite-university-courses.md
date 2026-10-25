@@ -1,7 +1,7 @@
 # Самостійна робота: React-аплікація «Навчальні курси»
 
 > **Курс:** Основи web програмування · ЛНУ ім. Івана Франка · ФПМІ
-> **Теорія:** [Лекція 6. React: компонентна модель, props, state](../../bacics-of-web-programming-2026/lectures/06-react-components-props-state.md)
+> **Теорія:** [Лекція 6. React: компонентна модель, props, state](../../lectures/06-react-components-props-state.md)
 > **Попередній приклад:** [«Кіносписок»](01-react-vite-movie-watchlist.md)
 > **Інструменти:** WebStorm, Node.js 24 LTS, Vite 8, React 19
 > **Час:** одна пара (≈ 80 хвилин) + додаткові завдання для тих, хто встигне
@@ -1871,7 +1871,7 @@ university-courses/
 
 ## 12. Корисні посилання
 
-- [Лекція 6 курсу](../../bacics-of-web-programming-2026/lectures/06-react-components-props-state.md) — усі посилання на розділи (§) ведуть туди.
+- [Лекція 6 курсу](../../lectures/06-react-components-props-state.md) — усі посилання на розділи (§) ведуть туди.
 - [«Кіносписок»](01-react-vite-movie-watchlist.md) — попередній приклад із детальним описом створення проєкту у WebStorm.
 - [react.dev — Choosing the State Structure](https://react.dev/learn/choosing-the-state-structure) — чому не дублювати дані в стані й зберігати `id` замість об'єкта.
 - [react.dev — Preserving and Resetting State](https://react.dev/learn/preserving-and-resetting-state) — як працює `key` для скидання стану (крок 8.3).
