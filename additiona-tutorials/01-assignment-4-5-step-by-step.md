@@ -3,7 +3,7 @@
 > **Курс:** Основи web програмування · ЛНУ ім. Івана Франка · ФПМІ
 > **Завдання:** №4. REST API на Node.js + PostgreSQL · №5. Клієнт-серверний застосунок (React + API) і розгортання
 > **Інструменти:** WebStorm 2026.2, Node.js 24 LTS, Docker Desktop, PostgreSQL 18, Express 5, Zod 4, React 19, React Router 8, Vite 8
-> **Готові проєкти:** [`assignment-4/`](assignment-4/) (сервер у стані здачі №4) і [`assignment-5/`](assignment-5/) (сервер + клієнт у стані здачі №5) — поруч із цим файлом
+> **Готові проєкти:** [`assignment-4/`](../lessons/11.11/assignment-4/) (сервер у стані здачі №4) і [`assignment-5/`](../lessons/11.11/assignment-5/) (сервер + клієнт у стані здачі №5) — у папці [`lessons/11.11/`](../lessons/11.11/)
 > **Обсяг:** близько 10–12 годин на частину I і 12–15 годин на частину II, якщо виконувати всі кроки й експерименти
 
 Цей посібник — повний робочий приклад двох останніх завдань курсу. Крок за
@@ -18,14 +18,14 @@
   для телефона, планшета й комп'ютера, — а також розгортання всього
   застосунку в інтернеті.
 
-Предметна область та сама, що й у [прикладі Завдання №3](../../additiona-tutorials/assignment-3-music-catalog.md):
+Предметна область та сама, що й у [прикладі Завдання №3](assignment-3-music-catalog.md):
 **альбоми** й **виконавці**. Тільки тепер дані живуть не в `localStorage`, а
 в справжній базі даних на сервері.
 
 Посібник **самодостатній**: перед кожним кроком є теорія, потрібна саме для
 нього, — що це, навіщо й **чому зроблено саме так, а не інакше**. Лекції
 11–16 допоможуть зрозуміти глибше, але щоб виконати приклад, вони не
-обов'язкові. Окремо поруч лежить [збірка кращих практик](02-best-practices-node-react-api.md) —
+обов'язкові. Окремо поруч лежить [збірка кращих практик](03-best-practices-node-react-api.md) —
 коротка шпаргалка правил, яку зручно тримати відкритою під час роботи над
 власним проєктом.
 
@@ -119,13 +119,13 @@
 
 | Телефон | Планшет |
 |---|---|
-| ![Телефон](assignment-5/docs/screenshots/fonoteka-mobile.png) | ![Планшет](assignment-5/docs/screenshots/fonoteka-tablet.png) |
+| ![Телефон](../lessons/11.11/assignment-5/docs/screenshots/fonoteka-mobile.png) | ![Планшет](../lessons/11.11/assignment-5/docs/screenshots/fonoteka-tablet.png) |
 
-![Комп'ютер: бічна панель фільтрів і таблиця з сортуванням](assignment-5/docs/screenshots/fonoteka-desktop.png)
+![Комп'ютер: бічна панель фільтрів і таблиця з сортуванням](../lessons/11.11/assignment-5/docs/screenshots/fonoteka-desktop.png)
 
 | Сторінка альбому | Форма з помилками сервера | Вхід |
 |---|---|---|
-| ![Деталі](assignment-5/docs/screenshots/fonoteka-details.png) | ![Форма](assignment-5/docs/screenshots/fonoteka-form.png) | ![Вхід](assignment-5/docs/screenshots/fonoteka-login.png) |
+| ![Деталі](../lessons/11.11/assignment-5/docs/screenshots/fonoteka-details.png) | ![Форма](../lessons/11.11/assignment-5/docs/screenshots/fonoteka-form.png) | ![Вхід](../lessons/11.11/assignment-5/docs/screenshots/fonoteka-login.png) |
 
 ### 0.1. Предметна область
 
@@ -4600,7 +4600,7 @@ RESTful web service на **Node.js + Express 5 + PostgreSQL 18** для ката
 
 > Навчальний приклад до курсу «Основи web програмування» (ЛНУ, ФПМІ).
 > Покроковий опис створення — у файлі
-> [`../01-assignment-4-5-step-by-step.md`](../01-assignment-4-5-step-by-step.md).
+> [`additiona-tutorials/01-assignment-4-5-step-by-step.md`](../../../additiona-tutorials/01-assignment-4-5-step-by-step.md).
 > Тему «Музичні альбоми» для власного завдання брати не можна.
 
 ## Сутність «Альбом»
@@ -5178,7 +5178,7 @@ export default router;
 
 **`server/docs/openapi.yaml`** — зміни невеликі, тож замість повного файлу
 (понад 400 рядків) ось що треба змінити; готовий файл — у
-[`assignment-5/server/docs/openapi.yaml`](assignment-5/server/docs/openapi.yaml):
+[`assignment-5/server/docs/openapi.yaml`](../lessons/11.11/assignment-5/server/docs/openapi.yaml):
 
 1. У `components.schemas` додайте схеми сторінки й нового виконавця:
 
@@ -5210,7 +5210,7 @@ export default router;
 **`server/requests.http`** — у запиті «Список: перша сторінка» тепер
 `response.body.data[0].id` замість `response.body[0].id`, а в кінці файлу —
 два нові запити (готовий файл — у
-[`assignment-5/server/requests.http`](assignment-5/server/requests.http)):
+[`assignment-5/server/requests.http`](../lessons/11.11/assignment-5/server/requests.http)):
 
 ```http
 ### Один виконавець
@@ -10066,7 +10066,7 @@ Categories — **Accessibility** (можна й решту) → **Analyze page l
 Вимога — **≥ 90**; наш приклад отримує **100** на сторінках списку, альбому
 й входу.
 
-![Звіт Lighthouse: Accessibility 100](assignment-5/docs/screenshots/lighthouse-accessibility.png)
+![Звіт Lighthouse: Accessibility 100](../lessons/11.11/assignment-5/docs/screenshots/lighthouse-accessibility.png)
  Якщо бал нижчий, Lighthouse показує конкретні елементи:
 найчастіше це недостатній контраст тексту, поля без `<label>`, кнопки-іконки
 без `aria-label`, пропущені рівні заголовків.
@@ -10085,7 +10085,7 @@ Categories — **Accessibility** (можна й решту) → **Analyze page l
 
 > Навчальний приклад до курсу «Основи web програмування» (ЛНУ, ФПМІ).
 > Покроковий опис створення — у файлі
-> [`../01-assignment-4-5-step-by-step.md`](../01-assignment-4-5-step-by-step.md).
+> [`additiona-tutorials/01-assignment-4-5-step-by-step.md`](../../../additiona-tutorials/01-assignment-4-5-step-by-step.md).
 > Тему «Музичні альбоми» для власного завдання брати не можна.
 
 | Телефон (375 px) | Планшет (834 px) |
@@ -10519,10 +10519,10 @@ fonoteka/
 
 **Матеріали курсу**
 
-- Лекції [11](../../lectures/11-nodejs-runtime.md) · [12](../../lectures/12-express-middleware-architecture.md) · [13](../../lectures/13-rest-api-postgresql.md) · [14](../../lectures/14-auth-security.md) · [15](../../lectures/15-nodejs-quality-testing-openapi.md) · [16](../../lectures/16-integration-deployment.md)
-- [HTTP і HTTPS під капотом](../../additional-materials/http-https-rest.md)
-- [Приклад Завдання №3](../../additiona-tutorials/assignment-3-music-catalog.md)
-- [Кращі практики: Node.js і REST API в React](02-best-practices-node-react-api.md)
+- Лекції [11](../lectures/11-nodejs-runtime.md) · [12](../lectures/12-express-middleware-architecture.md) · [13](../lectures/13-rest-api-postgresql.md) · [14](../lectures/14-auth-security.md) · [15](../lectures/15-nodejs-quality-testing-openapi.md) · [16](../lectures/16-integration-deployment.md)
+- [HTTP і HTTPS під капотом](../additional-materials/http-https-rest.md)
+- [Приклад Завдання №3](assignment-3-music-catalog.md)
+- [Кращі практики: Node.js і REST API в React](03-best-practices-node-react-api.md)
 
 ---
 

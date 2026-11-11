@@ -2,7 +2,7 @@
 
 > **Курс:** Основи web програмування · ЛНУ ім. Івана Франка · ФПМІ
 > **Для чого:** шпаргалка правил для Завдань №4 і №5 і для власних проєктів після курсу
-> **Приклади коду:** [`assignment-4/`](assignment-4/) і [`assignment-5/`](assignment-5/), покроковий розбір — у
+> **Приклади коду:** [`assignment-4/`](../lessons/11.11/assignment-4/) і [`assignment-5/`](../lessons/11.11/assignment-5/), покроковий розбір — у
 > [посібнику](01-assignment-4-5-step-by-step.md)
 > **Актуально станом на:** листопад 2026 року (Node.js 24 LTS, Express 5, React 19, React Router 8)
 
@@ -600,7 +600,7 @@ JavaScript. Адреса API — так, ключі сторонніх серв�
 - [MDN — Using the Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch) · [AbortController](https://developer.mozilla.org/en-US/docs/Web/API/AbortController)
 - [Vite — Env Variables and Modes](https://vite.dev/guide/env-and-mode)
 - [TanStack Query](https://tanstack.com/query/latest)
-- Лекції курсу [11–16](../../lectures/README.md) і [HTTP і HTTPS під капотом](../../additional-materials/http-https-rest.md)
+- Лекції курсу [11–16](../lectures/README.md) і [HTTP і HTTPS під капотом](../additional-materials/http-https-rest.md)
 
 > Матеріал підготовлено за допомогою Claude (Anthropic) на основі прикладів
 > до Завдань №4 і №5 і перелічених джерел.
