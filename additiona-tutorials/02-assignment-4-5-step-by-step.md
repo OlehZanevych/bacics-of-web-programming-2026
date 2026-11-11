@@ -1052,7 +1052,9 @@ INSERT INTO artists (name) VALUES ('Тест');
 
 INSERT INTO albums (title, artist_id, release_date, track_count, format)
 VALUES ('Тест', 1, '2020-01-01', 0, 'cd');
--- ERROR: new row … violates check constraint "albums_track_count_check"
+-- ERROR: new row … violates check constraint "albums_chck_1"
+-- (node-pg-migrate нумерує CHECK-обмеження за порядком: _1 — track_count, _2 — duration_minutes, …;
+--  переглянути їх можна командою \d albums)
 
 INSERT INTO albums (title, artist_id, release_date, track_count, format)
 VALUES ('Тест', 999, '2020-01-01', 5, 'cd');

@@ -1,0 +1,29 @@
+# PostgreSQL для розробки.
+#   docker compose up -d      — запустити у фоні
+#   docker compose down       — зупинити (дані збережуться в томі pgdata)
+#   docker compose down -v    — зупинити й ВИДАЛИТИ дані
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: fonoteka-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fonoteka
+      POSTGRES_PASSWORD: fonoteka_dev_password
+      POSTGRES_DB: fonoteka
+      # Українське сортування (Ґ після Г, Є після Е, І після И) через ICU.
+      # Діє лише під час ПЕРШОГО створення бази (порожній том).
+      POSTGRES_INITDB_ARGS: --locale-provider=icu --icu-locale=uk-UA
+    ports:
+      - '5433:5432'
+    volumes:
+      # Для образів 18+ — саме /var/lib/postgresql (для ≤17 було …/postgresql/data)
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fonoteka -d fonoteka']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
