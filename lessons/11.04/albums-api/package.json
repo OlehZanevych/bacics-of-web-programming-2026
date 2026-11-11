@@ -1,0 +1,19 @@
+{
+  "name": "albums-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "REST API для «Фонотеки»: альбоми, виконавці, жанри",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file=.env src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "demo:http": "node examples/node-http-server.js"
+  },
+  "dependencies": {
+    "express": "^5.3.0"
+  }
+}
