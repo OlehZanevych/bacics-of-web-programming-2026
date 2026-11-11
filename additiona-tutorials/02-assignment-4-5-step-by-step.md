@@ -18,7 +18,7 @@
   для телефона, планшета й комп'ютера, — а також розгортання всього
   застосунку в інтернеті.
 
-Предметна область та сама, що й у [прикладі Завдання №3](assignment-3-music-catalog.md):
+Предметна область та сама, що й у [прикладі Завдання №3](01-assignment-3-music-catalog.md):
 **альбоми** й **виконавці**. Тільки тепер дані живуть не в `localStorage`, а
 в справжній базі даних на сервері.
 
@@ -4600,7 +4600,7 @@ RESTful web service на **Node.js + Express 5 + PostgreSQL 18** для ката
 
 > Навчальний приклад до курсу «Основи web програмування» (ЛНУ, ФПМІ).
 > Покроковий опис створення — у файлі
-> [`additiona-tutorials/01-assignment-4-5-step-by-step.md`](../../../additiona-tutorials/01-assignment-4-5-step-by-step.md).
+> [`additiona-tutorials/02-assignment-4-5-step-by-step.md`](../../../additiona-tutorials/02-assignment-4-5-step-by-step.md).
 > Тему «Музичні альбоми» для власного завдання брати не можна.
 
 ## Сутність «Альбом»
@@ -10085,7 +10085,7 @@ Categories — **Accessibility** (можна й решту) → **Analyze page l
 
 > Навчальний приклад до курсу «Основи web програмування» (ЛНУ, ФПМІ).
 > Покроковий опис створення — у файлі
-> [`additiona-tutorials/01-assignment-4-5-step-by-step.md`](../../../additiona-tutorials/01-assignment-4-5-step-by-step.md).
+> [`additiona-tutorials/02-assignment-4-5-step-by-step.md`](../../../additiona-tutorials/02-assignment-4-5-step-by-step.md).
 > Тему «Музичні альбоми» для власного завдання брати не можна.
 
 | Телефон (375 px) | Планшет (834 px) |
@@ -10521,7 +10521,7 @@ fonoteka/
 
 - Лекції [11](../lectures/11-nodejs-runtime.md) · [12](../lectures/12-express-middleware-architecture.md) · [13](../lectures/13-rest-api-postgresql.md) · [14](../lectures/14-auth-security.md) · [15](../lectures/15-nodejs-quality-testing-openapi.md) · [16](../lectures/16-integration-deployment.md)
 - [HTTP і HTTPS під капотом](../additional-materials/http-https-rest.md)
-- [Приклад Завдання №3](assignment-3-music-catalog.md)
+- [Приклад Завдання №3](01-assignment-3-music-catalog.md)
 - [Кращі практики: Node.js і REST API в React](03-best-practices-node-react-api.md)
 
 ---
