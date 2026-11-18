@@ -1,0 +1,4 @@
+node_modules/
+package-lock.json
+# Markdown форматуємо вручну: Prettier вирівнює таблиці пробілами
+*.md
