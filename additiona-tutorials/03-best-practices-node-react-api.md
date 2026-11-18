@@ -178,10 +178,16 @@ repositories`, плюс `mappers`, `validators`, `middlewares`, `errors`,
 даними користувача — ні шаблонними рядками, ні конкатенацією.
 
 ```js
-// ❌ pool.query(`SELECT * FROM albums WHERE title ILIKE '%${search}%'`)
+// ❌ pool.query(`SELECT id, title FROM albums WHERE title ILIKE '%${search}%'`)
 // ✅
-pool.query('SELECT * FROM albums WHERE title ILIKE $1', [`%${search}%`]);
+pool.query('SELECT id, title FROM albums WHERE title ILIKE $1', [`%${search}%`]);
 ```
+
+✅ **Перелічуйте стовпці явно — без `SELECT *` і `RETURNING *`.** Одразу
+видно, які дані повертає запит; новий стовпець у таблиці не потрапить у
+відповідь непомітно; 🔒 чутливі поля (`password_hash`) читаються лише там,
+де вони справді потрібні. 📍 `PUBLIC_COLUMNS` у
+`src/repositories/users.repository.js`
 
 🔒 **Ідентифікатори (стовпці сортування, напрямок) — лише з білого списку.**
 Параметром їх передати неможливо. 📍 `SORT_COLUMNS` у

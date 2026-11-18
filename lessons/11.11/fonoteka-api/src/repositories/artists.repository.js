@@ -2,7 +2,7 @@ import { pool } from '../db/pool.js';
 
 // Кількість альбомів — агрегацією в самій базі (LEFT JOIN лишає виконавців без альбомів)
 const SELECT_ARTISTS = `
-  SELECT ar.*, COUNT(a.id)::int AS album_count
+  SELECT ar.id, ar.name, ar.country, COUNT(a.id)::int AS album_count
     FROM artists ar
     LEFT JOIN albums a ON a.artist_id = ar.id`;
 

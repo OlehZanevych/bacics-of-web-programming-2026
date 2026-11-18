@@ -11,9 +11,13 @@ const SORT_COLUMNS = {
   createdAt: 'a.created_at',
 };
 
-// Альбом разом із виконавцем — ОДНИМ запитом (JOIN), без проблеми N+1
+// Альбом разом із виконавцем — ОДНИМ запитом (JOIN), без проблеми N+1.
+// Стовпці перелічено явно (а не SELECT *): видно, що саме повертає запит
 const SELECT_ALBUMS = `
-  SELECT a.*, ar.name AS artist_name, ar.country AS artist_country
+  SELECT a.id, a.title, a.description, a.artist_id, a.release_date, a.track_count,
+         a.duration_minutes, a.rating, a.format, a.in_collection, a.cover_url,
+         a.created_at, a.updated_at,
+         ar.name AS artist_name, ar.country AS artist_country
     FROM albums a
     JOIN artists ar ON ar.id = a.artist_id`;
 
@@ -70,8 +74,11 @@ export async function findById(id) {
   return rows[0] ?? null;
 }
 
+// Для перевірки унікальності назви потрібні лише id і назва
 export async function findByTitle(title) {
-  const { rows } = await pool.query('SELECT * FROM albums WHERE LOWER(title) = LOWER($1)', [title]);
+  const { rows } = await pool.query('SELECT id, title FROM albums WHERE LOWER(title) = LOWER($1)', [
+    title,
+  ]);
   return rows[0] ?? null;
 }
 

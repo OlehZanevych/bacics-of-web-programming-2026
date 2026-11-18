@@ -2022,8 +2022,9 @@ const USERS = [
   { email: 'user@fonoteka.test', password: 'UserPass123', role: 'USER' },
 ];
 
-// Багаторядкова вставка: VALUES ($1, $2), ($3, $4), … — один запит замість сотні
-async function insertMany(client, table, columns, rows) {
+// Багаторядкова вставка: VALUES ($1, $2), ($3, $4), … — один запит замість сотні.
+// returning — які стовпці повернути: лише потрібні, а не RETURNING *
+async function insertMany(client, table, columns, rows, returning = ['id']) {
   const params = [];
   const values = rows.map((row) => {
     const placeholders = row.map((value) => {
@@ -2033,7 +2034,8 @@ async function insertMany(client, table, columns, rows) {
     return `(${placeholders.join(', ')})`;
   });
   const { rows: inserted } = await client.query(
-    `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${values.join(', ')} RETURNING *`,
+    `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${values.join(', ')}
+     RETURNING ${returning.join(', ')}`,
     params,
   );
   return inserted;
@@ -2057,6 +2059,7 @@ async function main() {
       'artists',
       ['name', 'country'],
       artists.map((artist) => [artist.name, artist.country]),
+      ['id', 'name'], // ім'я потрібне, щоб зіставити альбоми з виконавцями
     );
     const artistId = new Map(insertedArtists.map((row) => [row.name, row.id]));
 
@@ -2131,7 +2134,7 @@ SELECT email, role, left(password_hash, 7) AS hash_start FROM users;
    (`SELECT title FROM albums ORDER BY title LIMIT 5;`) — вони ті самі.
 2. `SEED_ALBUMS=200 npm run seed` — альбомів стане 200 (у Windows
    PowerShell: `$env:SEED_ALBUMS=200; npm run seed`).
-3. Виконайте `EXPLAIN SELECT * FROM albums WHERE title ILIKE '%ніч%';` на 200
+3. Виконайте `EXPLAIN SELECT id, title FROM albums WHERE title ILIKE '%ніч%';` на 200
    альбомах. Після `SET enable_seqscan = off;` (лише для експерименту:
    на маленькій таблиці планувальник і так обирає повний перегляд) ви
    побачите `Bitmap Index Scan on albums_title_trgm_index` — триграмний
@@ -2457,7 +2460,7 @@ node -e "import('./src/validators/album.schemas.js').then(({ albumCreateSchema: 
 
 ```js
 // ❌ НІКОЛИ
-pool.query(`SELECT * FROM albums WHERE title ILIKE '%${search}%'`);
+pool.query(`SELECT id, title FROM albums WHERE title ILIKE '%${search}%'`);
 ```
 
 Пошук `zzz' OR '%'='` перетворить умову на `title ILIKE '%zzz' OR '%'='%'`, яка
@@ -2468,7 +2471,7 @@ pool.query(`SELECT * FROM albums WHERE title ILIKE '%${search}%'`);
 
 ```js
 // ✅ ЗАВЖДИ
-pool.query('SELECT * FROM albums WHERE title ILIKE $1', [`%${search}%`]);
+pool.query('SELECT id, title FROM albums WHERE title ILIKE $1', [`%${search}%`]);
 ```
 
 База отримує вже розібраний запит із «дірками» `$1, $2` і підставляє значення
@@ -2484,7 +2487,8 @@ pool.query('SELECT * FROM albums WHERE title ILIKE $1', [`%${search}%`]);
 ### 📚 Теорія: список із фільтрами, сортуванням і пагінацією
 
 ```sql
-SELECT a.*, ar.name AS artist_name, ar.country AS artist_country
+SELECT a.id, a.title, a.release_date, a.rating, …,  -- лише потрібні стовпці (повний список — у коді нижче)
+       ar.name AS artist_name, ar.country AS artist_country
   FROM albums a
   JOIN artists ar ON ar.id = a.artist_id      -- виконавець — тим самим запитом
  WHERE a.title ILIKE $1 AND a.format = $2      -- лише задані фільтри
@@ -2494,6 +2498,7 @@ SELECT a.*, ar.name AS artist_name, ar.country AS artist_country
 
 | Деталь | Навіщо |
 |---|---|
+| явний перелік стовпців замість `SELECT *` | одразу видно, які дані повертає запит; новий стовпець у таблиці (наприклад, службовий) не потрапить у відповідь непомітно; база не передає зайвого |
 | `JOIN` замість окремого запиту на виконавця | інакше 20 альбомів = 1 + 20 запитів (**проблема N+1**) |
 | умови додаються лише для заданих фільтрів | одна функція `buildFilters` для списку й для `/count` — результати не розійдуться |
 | `ILIKE` | пошук без урахування регістру (PostgreSQL) |
@@ -2520,9 +2525,13 @@ const SORT_COLUMNS = {
   createdAt: 'a.created_at',
 };
 
-// Альбом разом із виконавцем — ОДНИМ запитом (JOIN), без проблеми N+1
+// Альбом разом із виконавцем — ОДНИМ запитом (JOIN), без проблеми N+1.
+// Стовпці перелічено явно (а не SELECT *): видно, що саме повертає запит
 const SELECT_ALBUMS = `
-  SELECT a.*, ar.name AS artist_name, ar.country AS artist_country
+  SELECT a.id, a.title, a.description, a.artist_id, a.release_date, a.track_count,
+         a.duration_minutes, a.rating, a.format, a.in_collection, a.cover_url,
+         a.created_at, a.updated_at,
+         ar.name AS artist_name, ar.country AS artist_country
     FROM albums a
     JOIN artists ar ON ar.id = a.artist_id`;
 
@@ -2579,8 +2588,11 @@ export async function findById(id) {
   return rows[0] ?? null;
 }
 
+// Для перевірки унікальності назви потрібні лише id і назва
 export async function findByTitle(title) {
-  const { rows } = await pool.query('SELECT * FROM albums WHERE LOWER(title) = LOWER($1)', [title]);
+  const { rows } = await pool.query('SELECT id, title FROM albums WHERE LOWER(title) = LOWER($1)', [
+    title,
+  ]);
   return rows[0] ?? null;
 }
 
@@ -2645,7 +2657,7 @@ import { pool } from '../db/pool.js';
 
 // Кількість альбомів — агрегацією в самій базі (LEFT JOIN лишає виконавців без альбомів)
 const SELECT_ARTISTS = `
-  SELECT ar.*, COUNT(a.id)::int AS album_count
+  SELECT ar.id, ar.name, ar.country, COUNT(a.id)::int AS album_count
     FROM artists ar
     LEFT JOIN albums a ON a.artist_id = ar.id`;
 
@@ -3200,19 +3212,27 @@ export const signInSchema = z
 ```js
 import { pool } from '../db/pool.js';
 
+// Поля, які можна віддавати назовні. password_hash сюди НЕ входить:
+// його читає лише findByEmail — щоб перевірити пароль під час входу
+const PUBLIC_COLUMNS = 'id, email, role, created_at';
+
 export async function findByEmail(email) {
-  const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+  const { rows } = await pool.query(
+    `SELECT ${PUBLIC_COLUMNS}, password_hash FROM users WHERE LOWER(email) = LOWER($1)`,
+    [email],
+  );
   return rows[0] ?? null;
 }
 
 export async function findById(id) {
-  const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+  const { rows } = await pool.query(`SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = $1`, [id]);
   return rows[0] ?? null;
 }
 
 export async function create({ email, passwordHash, role }) {
   const { rows } = await pool.query(
-    'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING *',
+    `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3)
+     RETURNING ${PUBLIC_COLUMNS}`,
     [email, passwordHash, role],
   );
   return rows[0];
@@ -4967,8 +4987,9 @@ const USERS = [
   { email: 'user@fonoteka.test', password: 'UserPass123', role: 'USER' },
 ];
 
-// Багаторядкова вставка: VALUES ($1, $2), ($3, $4), … — один запит замість сотні
-async function insertMany(client, table, columns, rows) {
+// Багаторядкова вставка: VALUES ($1, $2), ($3, $4), … — один запит замість сотні.
+// returning — які стовпці повернути: лише потрібні, а не RETURNING *
+async function insertMany(client, table, columns, rows, returning = ['id']) {
   const params = [];
   const values = rows.map((row) => {
     const placeholders = row.map((value) => {
@@ -4978,7 +4999,8 @@ async function insertMany(client, table, columns, rows) {
     return `(${placeholders.join(', ')})`;
   });
   const { rows: inserted } = await client.query(
-    `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${values.join(', ')} RETURNING *`,
+    `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${values.join(', ')}
+     RETURNING ${returning.join(', ')}`,
     params,
   );
   return inserted;
@@ -5002,6 +5024,7 @@ async function main() {
       'artists',
       ['name', 'country'],
       artists.map((artist) => [artist.name, artist.country]),
+      ['id', 'name'], // ім'я потрібне, щоб зіставити альбоми з виконавцями
     );
     const artistId = new Map(insertedArtists.map((row) => [row.name, row.id]));
 
@@ -5082,7 +5105,7 @@ import { pool } from '../db/pool.js';
 
 // Кількість альбомів — агрегацією в самій базі (LEFT JOIN лишає виконавців без альбомів)
 const SELECT_ARTISTS = `
-  SELECT ar.*, COUNT(a.id)::int AS album_count
+  SELECT ar.id, ar.name, ar.country, COUNT(a.id)::int AS album_count
     FROM artists ar
     LEFT JOIN albums a ON a.artist_id = ar.id`;
 
@@ -5096,14 +5119,16 @@ export async function findById(id) {
   return rows[0] ?? null;
 }
 
+// Для перевірки унікальності імені досить знати, чи є такий рядок
 export async function findByName(name) {
-  const { rows } = await pool.query('SELECT * FROM artists WHERE LOWER(name) = LOWER($1)', [name]);
+  const { rows } = await pool.query('SELECT id FROM artists WHERE LOWER(name) = LOWER($1)', [name]);
   return rows[0] ?? null;
 }
 
 export async function create({ name, country }) {
   const { rows } = await pool.query(
-    'INSERT INTO artists (name, country) VALUES ($1, $2) RETURNING *, 0 AS album_count',
+    `INSERT INTO artists (name, country) VALUES ($1, $2)
+     RETURNING id, name, country, 0 AS album_count`,
     [name, country],
   );
   return rows[0];

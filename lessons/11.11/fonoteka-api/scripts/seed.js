@@ -12,8 +12,9 @@ const USERS = [
   { email: 'user@fonoteka.test', password: 'UserPass123', role: 'USER' },
 ];
 
-// Багаторядкова вставка: VALUES ($1, $2), ($3, $4), … — один запит замість сотні
-async function insertMany(client, table, columns, rows) {
+// Багаторядкова вставка: VALUES ($1, $2), ($3, $4), … — один запит замість сотні.
+// returning — які стовпці повернути: лише потрібні, а не RETURNING *
+async function insertMany(client, table, columns, rows, returning = ['id']) {
   const params = [];
   const values = rows.map((row) => {
     const placeholders = row.map((value) => {
@@ -23,7 +24,8 @@ async function insertMany(client, table, columns, rows) {
     return `(${placeholders.join(', ')})`;
   });
   const { rows: inserted } = await client.query(
-    `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${values.join(', ')} RETURNING *`,
+    `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${values.join(', ')}
+     RETURNING ${returning.join(', ')}`,
     params,
   );
   return inserted;
@@ -47,6 +49,7 @@ async function main() {
       'artists',
       ['name', 'country'],
       artists.map((artist) => [artist.name, artist.country]),
+      ['id', 'name'], // ім'я потрібне, щоб зіставити альбоми з виконавцями
     );
     const artistId = new Map(insertedArtists.map((row) => [row.name, row.id]));
 
