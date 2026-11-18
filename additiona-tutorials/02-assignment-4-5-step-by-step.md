@@ -842,8 +842,16 @@ OK.** Тепер таблиці видно в дереві, а SQL можна в
 
 ⚠️ **Порт 5432 зайнятий** (`Bind for 0.0.0.0:5432 failed: port is already
 allocated`)? Найчастіше — у системі вже встановлено PostgreSQL. Або
-зупиніть його, або змініть рядок портів на `'5433:5432'` і в `.env` — порт у
-`DATABASE_URL` на `5433`.
+зупиніть його, або змініть рядок портів на `'5433:5432'`. Тоді новий порт
+`5433` треба вказати **всюди**, де ви підключаєтеся до бази:
+
+- у `.env` — у `DATABASE_URL`;
+- у `.env.example` — щоб одногрупники не наступили на ті самі граблі;
+- у джерелі даних WebStorm (поле **Port**);
+- у `.env.test`, коли дійдете до тестів (крок 14).
+
+Команди `docker exec …` порт не цікавить: вони звертаються до контейнера
+напряму.
 
 ### ✅ Контрольна точка 3
 
@@ -4267,6 +4275,7 @@ GET {{api}}/artists
 # Налаштування для автоматичних тестів (npm test). Файл ПОТРАПЛЯЄ в git:
 # тут немає справжніх секретів — окрема тестова база й тестовий ключ.
 # Тестову базу створіть один раз: docker exec fonoteka-db createdb -U fonoteka fonoteka_test
+# Порт — той самий, що ліворуч у ports у docker-compose.yml (якщо змінили на 5433 — і тут 5433)
 NODE_ENV=test
 DATABASE_URL=postgresql://fonoteka:fonoteka_dev_password@localhost:5432/fonoteka_test
 JWT_SECRET=test-only-secret-that-is-at-least-32-characters-long
@@ -4590,6 +4599,13 @@ npm test
 ℹ pass 20
 ℹ fail 0
 ```
+
+⚠️ **Усі тести `cancelled`, а в звіті `password authentication failed for
+user "fonoteka"`?** Тести не змогли підключитися до бази, тому скасовано
+кожен. Найчастіше причина — порт: ви змінили його в `docker-compose.yml` і
+`.env` (крок 3.1), а в `.env.test` лишився `5432`. На цьому порту відповідає
+**інший** PostgreSQL, який не знає користувача `fonoteka`. Виправте порт у
+`DATABASE_URL` файлу `.env.test`.
 
 У WebStorm тести можна запускати й поодинці: зелена стрілка біля `test(…)`
 у файлі `tests/api.test.js`.
@@ -10419,7 +10435,8 @@ fonoteka/
 | `✖ Відсутня обов'язкова змінна середовища` | немає `.env` або змінної в ньому | `cp .env.example .env`, крок 2 |
 | `ECONNREFUSED 127.0.0.1:5432` | база не запущена | `docker compose up -d`, `docker compose ps` |
 | `password authentication failed` | інший пароль у `.env`, або том створено з іншим паролем | звірте `DATABASE_URL` з `docker-compose.yml`; у крайньому разі `docker compose down -v` |
-| `port is already allocated` | 5432 зайнятий локальним PostgreSQL | змініть порт на `5433:5432` і в `DATABASE_URL` |
+| `port is already allocated` | 5432 зайнятий локальним PostgreSQL | змініть порт на `5433:5432` і в `DATABASE_URL` у `.env`, `.env.example` і `.env.test` (крок 3.1) |
+| `npm test`: усі тести `cancelled`, `password authentication failed` | у `.env.test` інший порт, ніж у `docker-compose.yml`, або не створено базу `fonoteka_test` | порт як у `.env`; `docker exec fonoteka-db createdb -U fonoteka fonoteka_test` |
 | `relation "albums" does not exist` | не застосовано міграції | `npm run migrate:up` |
 | Дата альбому на день раніша | `DATE` перетворився на `Date` з часовим поясом | `types.setTypeParser(1082, …)`, крок 5 |
 | `"total": "60"` (рядок) | `COUNT(*)` — `bigint` | `COUNT(*)::int` |

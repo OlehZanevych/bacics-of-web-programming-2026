@@ -1,0 +1,169 @@
+# Запити до API «Фонотеки» (Завдання №4) для HTTP Client у WebStorm.
+# Запуск: зелена стрілка ▶ ліворуч від запиту. Виконуйте ЗГОРИ ВНИЗ: блоки > {% … %}
+# зберігають токени та id у змінні для наступних запитів.
+
+@baseUrl = http://localhost:3000
+@api = http://localhost:3000/api/v1
+
+### Стан сервера й бази
+GET {{baseUrl}}/health
+
+### Вхід як USER → зберігаємо токен
+POST {{api}}/auth/sign-in
+Content-Type: application/json
+
+{ "email": "user@fonoteka.test", "password": "UserPass123" }
+
+> {%
+  client.global.set('userToken', response.body.token);
+  client.test('200 і токен', () => client.assert(response.status === 200 && !!response.body.token));
+%}
+
+### Вхід як ADMIN → зберігаємо токен
+POST {{api}}/auth/sign-in
+Content-Type: application/json
+
+{ "email": "admin@fonoteka.test", "password": "AdminPass123" }
+
+> {% client.global.set('adminToken', response.body.token); %}
+
+### Неправильний пароль → 401
+POST {{api}}/auth/sign-in
+Content-Type: application/json
+
+{ "email": "user@fonoteka.test", "password": "wrong-password" }
+
+### Реєстрація нового користувача → 201 (повторний запуск → 409)
+POST {{api}}/auth/sign-up
+Content-Type: application/json
+
+{ "email": "student@lnu.edu.ua", "password": "StudentPass1" }
+
+### Спроба зареєструватися адміністратором → 400 (поле role невідоме)
+POST {{api}}/auth/sign-up
+Content-Type: application/json
+
+{ "email": "hacker@lnu.edu.ua", "password": "HackerPass1", "role": "ADMIN" }
+
+### Хто я (за токеном)
+GET {{api}}/auth/me
+Authorization: Bearer {{userToken}}
+
+### Оновлення токена → 200, новий токен і в тілі, і в заголовку Authorization
+POST {{api}}/auth/refresh-token
+Authorization: Bearer {{userToken}}
+
+> {%
+  client.test('Authorization у відповіді', () =>
+    client.assert(response.headers.valueOf('Authorization') === `Bearer ${response.body.token}`));
+%}
+
+### Список: перша сторінка (масив + заголовок X-Total-Count)
+GET {{api}}/albums?limit=5
+
+> {%
+  client.global.set('albumId', response.body[0].id);
+  client.test('X-Total-Count є', () => client.assert(Number(response.headers.valueOf('X-Total-Count')) > 0));
+%}
+
+### Сортування й пагінація: найновіші, друга сторінка
+GET {{api}}/albums?sort=releaseDate&order=desc&limit=5&offset=5
+
+### Фільтри: пошук, формат, виконавець, у колекції, роки, мінімальна оцінка
+GET {{api}}/albums?search=ніч&format=vinyl&inCollection=true&yearFrom=2000&yearTo=2025&ratingMin=3
+
+### Кількість із тими самими фільтрами
+GET {{api}}/albums/count?search=ніч&format=vinyl
+
+### Некоректні query → 400 з переліком полів
+GET {{api}}/albums?limit=1000&offset=-1&sort=password_hash&order=up
+
+### Один альбом
+GET {{api}}/albums/{{albumId}}
+
+### Неіснуючий альбом → 404
+GET {{api}}/albums/00000000-0000-4000-8000-000000000000
+
+### Некоректний id → 400
+GET {{api}}/albums/abc
+
+### Створення без токена → 401
+POST {{api}}/albums
+Content-Type: application/json
+
+{ "title": "Без токена", "artistId": 1, "releaseDate": "2026-01-01", "trackCount": 5, "format": "cd" }
+
+### Створення → 201 + Location
+POST {{api}}/albums
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "title": "Перший сніг",
+  "description": "Зимовий джаз із фолковими мотивами.",
+  "artistId": 3,
+  "releaseDate": "2026-01-15",
+  "trackCount": 9,
+  "durationMinutes": 41,
+  "format": "vinyl",
+  "coverUrl": "https://example.com/covers/first-snow.jpg"
+}
+
+> {%
+  client.global.set('newAlbumId', response.body.id);
+  client.test('201 + Location', () => client.assert(response.status === 201 && !!response.headers.valueOf('Location')));
+%}
+
+### Та сама назва в іншому регістрі → 409
+POST {{api}}/albums
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{ "title": "перший СНІГ", "artistId": 3, "releaseDate": "2026-01-15", "trackCount": 9, "format": "cd" }
+
+### Невалідне тіло → 400 (сім помилок)
+POST {{api}}/albums
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "title": "",
+  "artistId": "три",
+  "releaseDate": "2026-02-30",
+  "trackCount": 0,
+  "format": "mp3",
+  "coverUrl": "javascript:alert(1)",
+  "isAdmin": true
+}
+
+### PATCH: лише оцінка → 204
+PATCH {{api}}/albums/{{newAlbumId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{ "rating": 5 }
+
+### PUT: повна заміна → 204 (не передані rating, coverUrl стануть null)
+PUT {{api}}/albums/{{newAlbumId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{ "title": "Перший сніг (перевидання)", "artistId": 3, "releaseDate": "2026-02-01", "trackCount": 10, "format": "cd" }
+
+### Перевірити результат
+GET {{api}}/albums/{{newAlbumId}}
+
+### Видалення як USER → 403
+DELETE {{api}}/albums/{{newAlbumId}}
+Authorization: Bearer {{userToken}}
+
+### Видалення як ADMIN → 204
+DELETE {{api}}/albums/{{newAlbumId}}
+Authorization: Bearer {{adminToken}}
+
+### Повторне видалення → 404
+DELETE {{api}}/albums/{{newAlbumId}}
+Authorization: Bearer {{adminToken}}
+
+### Виконавці (довідник)
+GET {{api}}/artists

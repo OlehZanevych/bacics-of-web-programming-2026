@@ -1,0 +1,382 @@
+openapi: 3.1.0
+
+info:
+  title: Фонотека API
+  version: 1.0.0
+  description: |
+    Навчальний REST API каталогу музичних альбомів (приклад до Завдання №4).
+    GET-запити публічні; POST, PUT, PATCH — з токеном; DELETE — лише ADMIN.
+    Токен: POST /auth/sign-in → кнопка «Authorize» → вставте значення token.
+
+servers:
+  - url: /api/v1
+    description: Цей сервер
+
+tags:
+  - name: Albums
+    description: Альбоми (головна сутність)
+  - name: Artists
+    description: Виконавці (довідник)
+  - name: Auth
+    description: Реєстрація та вхід
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    AlbumId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Search:
+      name: search
+      in: query
+      description: Частковий збіг у назві, без урахування регістру
+      schema: { type: string, maxLength: 100 }
+    ArtistId:
+      name: artistId
+      in: query
+      schema: { type: integer, minimum: 1 }
+    Format:
+      name: format
+      in: query
+      schema: { $ref: '#/components/schemas/Format' }
+    InCollection:
+      name: inCollection
+      in: query
+      schema: { type: string, enum: ['true', 'false'] }
+    YearFrom:
+      name: yearFrom
+      in: query
+      schema: { type: integer, minimum: 1900, maximum: 2100 }
+    YearTo:
+      name: yearTo
+      in: query
+      schema: { type: integer, minimum: 1900, maximum: 2100 }
+    RatingMin:
+      name: ratingMin
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 5 }
+
+  schemas:
+    Format:
+      type: string
+      enum: [vinyl, cd, cassette, digital]
+
+    Album:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, example: Гірська весна }
+        description: { type: [string, 'null'] }
+        artist:
+          type: object
+          properties:
+            id: { type: integer, example: 1 }
+            name: { type: string, example: Карпатський вітер }
+            country: { type: [string, 'null'], example: Україна }
+        releaseDate: { type: string, format: date, example: '2014-04-18' }
+        trackCount: { type: integer, example: 11 }
+        durationMinutes: { type: [integer, 'null'], example: 47 }
+        rating: { type: [integer, 'null'], minimum: 1, maximum: 5 }
+        format: { $ref: '#/components/schemas/Format' }
+        inCollection: { type: boolean }
+        coverUrl: { type: [string, 'null'], format: uri }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AlbumInput:
+      type: object
+      additionalProperties: false
+      required: [title, artistId, releaseDate, trackCount, format]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200, example: Перший сніг }
+        description: { type: [string, 'null'], maxLength: 2000 }
+        artistId: { type: integer, minimum: 1, example: 3 }
+        releaseDate: { type: string, format: date, example: '2026-01-15' }
+        trackCount: { type: integer, minimum: 1, maximum: 999, example: 9 }
+        durationMinutes: { type: [integer, 'null'], minimum: 1, maximum: 600, example: 41 }
+        rating: { type: [integer, 'null'], minimum: 1, maximum: 5 }
+        format: { $ref: '#/components/schemas/Format' }
+        inCollection: { type: boolean, default: false }
+        coverUrl: { type: [string, 'null'], format: uri, maxLength: 500 }
+
+    AlbumPatch:
+      description: Будь-яка підмножина полів AlbumInput (хоча б одне)
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title: { type: string }
+        description: { type: [string, 'null'] }
+        artistId: { type: integer }
+        releaseDate: { type: string, format: date }
+        trackCount: { type: integer }
+        durationMinutes: { type: [integer, 'null'] }
+        rating: { type: [integer, 'null'] }
+        format: { $ref: '#/components/schemas/Format' }
+        inCollection: { type: boolean }
+        coverUrl: { type: [string, 'null'] }
+
+    Artist:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        country: { type: [string, 'null'] }
+        albumCount: { type: integer }
+
+    Credentials:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: admin@fonoteka.test }
+        password: { type: string, minLength: 8, example: AdminPass123 }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        role: { type: string, enum: [USER, ADMIN] }
+        createdAt: { type: string, format: date-time }
+
+    AuthResult:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        token: { type: string, description: 'JWT (HS256), payload { sub, role, iat, exp }' }
+
+    Error:
+      type: object
+      properties:
+        status: { type: integer, example: 400 }
+        message: { type: string, example: Помилка валідації }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string, example: title }
+              message: { type: string, example: Назва обов'язкова }
+        path: { type: string }
+        timestamp: { type: string, format: date-time }
+
+  responses:
+    BadRequest:
+      description: Некоректні вхідні дані
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: Немає токена або він недійсний
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Forbidden:
+      description: Недостатньо прав (потрібна роль ADMIN)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Ресурс не знайдено
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: Конфлікт (наприклад, альбом із такою назвою вже є)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+paths:
+  /albums:
+    get:
+      tags: [Albums]
+      summary: Список альбомів (пагінація, сортування, фільтри)
+      parameters:
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/ArtistId'
+        - $ref: '#/components/parameters/Format'
+        - $ref: '#/components/parameters/InCollection'
+        - $ref: '#/components/parameters/YearFrom'
+        - $ref: '#/components/parameters/YearTo'
+        - $ref: '#/components/parameters/RatingMin'
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [title, releaseDate, rating, trackCount, createdAt]
+            default: title
+        - name: order
+          in: query
+          schema: { type: string, enum: [asc, desc], default: asc }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: Масив альбомів; загальна кількість — у заголовку X-Total-Count
+          headers:
+            X-Total-Count: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Album' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    post:
+      tags: [Albums]
+      summary: Створити альбом
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AlbumInput' } } }
+      responses:
+        '201':
+          description: Створено
+          headers:
+            Location: { schema: { type: string }, description: URL створеного альбому }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Album' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /albums/count:
+    get:
+      tags: [Albums]
+      summary: Кількість альбомів із тими самими фільтрами
+      parameters:
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/ArtistId'
+        - $ref: '#/components/parameters/Format'
+        - $ref: '#/components/parameters/InCollection'
+        - $ref: '#/components/parameters/YearFrom'
+        - $ref: '#/components/parameters/YearTo'
+        - $ref: '#/components/parameters/RatingMin'
+      responses:
+        '200':
+          description: Кількість
+          content:
+            application/json:
+              schema: { type: object, properties: { total: { type: integer, example: 60 } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /albums/{id}:
+    parameters:
+      - $ref: '#/components/parameters/AlbumId'
+    get:
+      tags: [Albums]
+      summary: Один альбом разом із виконавцем
+      responses:
+        '200':
+          description: Успіх
+          content: { application/json: { schema: { $ref: '#/components/schemas/Album' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Albums]
+      summary: Замінити альбом повністю (не передані необов'язкові поля стають null)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AlbumInput' } } }
+      responses:
+        '204': { description: Оновлено }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    patch:
+      tags: [Albums]
+      summary: Змінити лише передані поля
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AlbumPatch' } } }
+      responses:
+        '204': { description: Оновлено }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Albums]
+      summary: Видалити альбом (лише ADMIN)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Видалено }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /artists:
+    get:
+      tags: [Artists]
+      summary: Усі виконавці з кількістю альбомів
+      responses:
+        '200':
+          description: Успіх
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Artist' } }
+
+  /auth/sign-up:
+    post:
+      tags: [Auth]
+      summary: Реєстрація (роль завжди USER)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/Credentials' } } }
+      responses:
+        '201':
+          description: Зареєстровано
+          headers:
+            Authorization:
+              description: Той самий токен у форматі `Bearer <jwt>`
+              schema: { type: string }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { description: Забагато спроб }
+
+  /auth/sign-in:
+    post:
+      tags: [Auth]
+      summary: Вхід — повертає JWT
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/Credentials' } } }
+      responses:
+        '200':
+          description: Успіх
+          headers:
+            Authorization:
+              description: Той самий токен у форматі `Bearer <jwt>`
+              schema: { type: string }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { description: Забагато спроб }
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Обміняти ще дійсний токен на новий
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Новий токен
+          headers:
+            Authorization:
+              description: Той самий токен у форматі `Bearer <jwt>`
+              schema: { type: string }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Поточний користувач за токеном
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Успіх
+          content: { application/json: { schema: { $ref: '#/components/schemas/User' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
